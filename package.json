@@ -83,6 +83,6 @@
     "vitest": "^3.2.4"
   },
   "peerDependencies": {
-    "kysely": "^0.28.7"
+    "kysely": ">=0.28.6"
   }
 }
