@@ -1,5 +1,0 @@
----
-'kysely-cursor': patch
----
-
-Release
