@@ -1,0 +1,5 @@
+---
+'kysely-cursor': patch
+---
+
+Init

@@ -1,18 +1,18 @@
-import type { StartedMSSQLServerContainer } from "@testcontainers/mssqlserver";
-import { MSSQLServerContainer } from "@testcontainers/mssqlserver";
-import { Kysely, MssqlDialect, sql } from "kysely";
-import * as Tarn from "tarn";
-import * as Tedious from "tedious";
-import { afterAll, beforeAll, describe } from "vitest";
+import type { StartedMSSQLServerContainer } from '@testcontainers/mssqlserver'
+import { MSSQLServerContainer } from '@testcontainers/mssqlserver'
+import { Kysely, MssqlDialect, sql } from 'kysely'
+import * as Tarn from 'tarn'
+import * as Tedious from 'tedious'
+import { afterAll, beforeAll, describe } from 'vitest'
 
-import { MssqlPaginationDialect } from "~/dialect/mssql.js";
+import { MssqlPaginationDialect } from '~/dialect/mssql.js'
 
-import type { DatabaseConfig, TestDB } from "./shared.js";
-import { createTestData, createTestHelpers, runSharedTests } from "./shared.js";
+import type { DatabaseConfig, TestDB } from './shared.js'
+import { createTestData, createTestHelpers, runSharedTests } from './shared.js'
 
-describe("MSSQL pagination helper", () => {
-  let mssql: StartedMSSQLServerContainer;
-  let db: Kysely<TestDB>;
+describe('MSSQL pagination helper', () => {
+  let mssql: StartedMSSQLServerContainer
+  let db: Kysely<TestDB>
 
   const config: DatabaseConfig = {
     dialect: MssqlPaginationDialect,
@@ -25,27 +25,23 @@ describe("MSSQL pagination helper", () => {
           rating int NULL,
           active bit NOT NULL DEFAULT 1
         )
-      `.execute(db);
+      `.execute(db)
     },
     insertTestData: async (db, rows) => {
-      await db.insertInto("users").values(rows).execute();
+      await db.insertInto('users').values(rows).execute()
     },
     applySortToQuery: (query, sorts) => {
       for (const s of sorts) {
-        const dir = s.dir ?? "asc";
+        const dir = s.dir ?? 'asc'
         // MSSQL's default NULLS behavior: NULLS FIRST for ASC, NULLS LAST for DESC
-        query = query.orderBy(s.col as any, dir);
+        query = query.orderBy(s.col as any, dir)
       }
-      return query;
+      return query
     },
-  };
+  }
 
   beforeAll(async () => {
-    mssql = await new MSSQLServerContainer(
-      "mcr.microsoft.com/mssql/server:2022-latest",
-    )
-      .acceptLicense()
-      .start();
+    mssql = await new MSSQLServerContainer('mcr.microsoft.com/mssql/server:2022-latest').acceptLicense().start()
 
     const dialect = new MssqlDialect({
       tarn: {
@@ -69,7 +65,7 @@ describe("MSSQL pagination helper", () => {
               connectTimeout: 30_000,
             },
             authentication: {
-              type: "default",
+              type: 'default',
               options: {
                 userName: mssql.getUsername(),
                 password: mssql.getPassword(),
@@ -77,19 +73,19 @@ describe("MSSQL pagination helper", () => {
             },
           }),
       },
-    });
+    })
 
-    db = new Kysely<TestDB>({ dialect });
+    db = new Kysely<TestDB>({ dialect })
 
-    await config.createTable(db);
-    const testData = createTestData();
-    await config.insertTestData(db, testData);
-  }, 60_000);
+    await config.createTable(db)
+    const testData = createTestData()
+    await config.insertTestData(db, testData)
+  }, 60_000)
 
   afterAll(async () => {
-    await db?.destroy().catch(() => {});
-    await mssql?.stop().catch(() => {});
-  });
+    await db?.destroy().catch(() => {})
+    await mssql?.stop().catch(() => {})
+  })
 
-  runSharedTests(() => createTestHelpers(db, config), "mssql");
-});
+  runSharedTests(() => createTestHelpers(db, config), 'mssql')
+})

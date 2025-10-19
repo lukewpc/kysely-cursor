@@ -1,6 +1,6 @@
 {
   "name": "kysely-cursor",
-  "version": "0.0.1-alpha",
+  "version": "0.0.1",
   "type": "module",
   "description": "Cursor based pagination utils for Kysely",
   "repository": {
@@ -31,7 +31,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --check .",
     "format:fix": "prettier --write .",
-    "prePublishOnly": "pnpm run build",
+    "prepublishOnly": "pnpm run build",
     "changeset": "changeset",
     "changeset:version": "changeset version",
     "changeset:publish": "changeset publish"

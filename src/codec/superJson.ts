@@ -1,6 +1,6 @@
-import superjson from "superjson";
+import superjson from 'superjson'
 
-import type { Codec } from "./codec.js";
+import type { Codec } from './codec.js'
 
 /**
  * SuperJSON object codec.
@@ -9,4 +9,4 @@ import type { Codec } from "./codec.js";
 export const superJsonCodec: Codec<unknown, string> = {
   encode: (value) => superjson.stringify(value),
   decode: (value) => superjson.parse(value),
-};
+}
