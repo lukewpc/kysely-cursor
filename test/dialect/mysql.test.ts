@@ -2,7 +2,6 @@ import type { StartedMySqlContainer } from '@testcontainers/mysql'
 import { MySqlContainer } from '@testcontainers/mysql'
 import { Kysely, MysqlDialect, sql } from 'kysely'
 import * as mysql from 'mysql2'
-import { afterAll, beforeAll, describe } from 'vitest'
 
 import { MysqlPaginationDialect } from '~/dialect/mysql.js'
 

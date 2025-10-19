@@ -2,7 +2,6 @@ import type { StartedPostgreSqlContainer } from '@testcontainers/postgresql'
 import { PostgreSqlContainer } from '@testcontainers/postgresql'
 import { Kysely, PostgresDialect, sql } from 'kysely'
 import { Pool } from 'pg'
-import { afterAll, beforeAll, describe } from 'vitest'
 
 import { PostgresPaginationDialect } from '~/dialect/postgres.js'
 

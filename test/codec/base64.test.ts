@@ -1,5 +1,3 @@
-import { describe, expect, it } from 'vitest'
-
 import { base64UrlCodec } from '~/codec/base64Url.js'
 
 describe('base64UrlCodec', () => {

@@ -1,5 +1,4 @@
 import type { SelectQueryBuilder } from 'kysely'
-import { describe, expectTypeOf, it } from 'vitest'
 
 import { MssqlPaginationDialect } from '../src/dialect/mssql.js'
 import { PostgresPaginationDialect } from '../src/dialect/postgres.js'
