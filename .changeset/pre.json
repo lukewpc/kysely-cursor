@@ -4,5 +4,7 @@
   "initialVersions": {
     "kysely-cursor": "0.0.1"
   },
-  "changesets": []
+  "changesets": [
+    "upset-zoos-ask"
+  ]
 }
