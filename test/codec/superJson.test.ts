@@ -1,5 +1,3 @@
-import { describe, expect, it } from 'vitest'
-
 import { superJsonCodec } from '~/codec/superJson.js'
 
 describe('superJsonCodec', () => {

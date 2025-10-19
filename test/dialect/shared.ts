@@ -1,5 +1,4 @@
 import type { Generated, Kysely, Selectable } from 'kysely'
-import { expect, it } from 'vitest'
 
 import { base64UrlCodec } from '~/codec/base64Url.js'
 import { codecPipe } from '~/codec/codec.js'

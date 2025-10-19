@@ -1,5 +1,3 @@
-import { describe, expect, it } from 'vitest'
-
 import { createAesCodec } from '~/codec/encrypt.js'
 
 describe('createAesCodec (AES-256-GCM)', () => {

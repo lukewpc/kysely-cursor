@@ -1,5 +1,3 @@
-import { describe, expect, it } from 'vitest'
-
 import { type Stash, stashCodec } from '~/codec/stash.js'
 
 describe('stashCodec', () => {

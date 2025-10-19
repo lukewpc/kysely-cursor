@@ -24,17 +24,20 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsup",
+    "build": "tsup -c tsconfig.build.json",
     "clean": "rm -rf dist",
     "test": "vitest run --coverage",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --check .",
     "format:fix": "prettier --write .",
+    "prepack": "pnpm run build",
     "prepublishOnly": "pnpm run build",
     "changeset": "changeset",
     "changeset:version": "changeset version",
-    "changeset:publish": "changeset publish"
+    "changeset:publish": "changeset publish",
+    "example:postgres": "pnpm --filter kysely-cursor-example-postgres dev"
   },
   "keywords": [
     "kysely",
@@ -57,13 +60,15 @@
     "@testcontainers/mssqlserver": "^11.6.0",
     "@testcontainers/mysql": "^11.6.0",
     "@testcontainers/postgresql": "^11.6.0",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^24.7.1",
     "@types/pg": "^8.15.5",
     "@vitest/coverage-v8": "3.2.4",
+    "better-sqlite3": "^12.4.1",
     "eslint": "^9.37.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-simple-import-sort": "^12.1.1",
-    "kysely": "^0.28.7",
+    "kysely": "^0.28.8",
     "mssql": "^10.0.2",
     "mysql2": "^3.11.3",
     "pg": "^8.11.5",
@@ -78,6 +83,6 @@
     "vitest": "^3.2.4"
   },
   "peerDependencies": {
-    "kysely": "^0.28.7"
+    "kysely": ">=0.28.6"
   }
 }
