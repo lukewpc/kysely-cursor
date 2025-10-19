@@ -1,6 +1,6 @@
-import { randomUUID } from "crypto";
+import { randomUUID } from 'crypto'
 
-import type { Codec } from "./codec.js";
+import type { Codec } from './codec.js'
 
 /**
  * A simple asynchronous key-value storage interface.
@@ -14,14 +14,14 @@ export type Stash = {
    * @param key The key to retrieve.
    * @returns The value.
    */
-  get: (key: string) => Promise<string>;
+  get: (key: string) => Promise<string>
   /**
    * Store a value under a specific key.
    * @param key The key to store the value under.
    * @param value The value to store.
    */
-  set: (key: string, value: string) => Promise<void>;
-};
+  set: (key: string, value: string) => Promise<void>
+}
 
 /**
  * Creates a {@link Codec} that encodes strings into stash keys and decodes keys back into their stored strings.
@@ -38,8 +38,8 @@ export type Stash = {
 export const stashCodec = (stash: Stash): Codec<string, string> => ({
   decode: (value) => stash.get(value),
   encode: async (value) => {
-    const key = randomUUID();
-    await stash.set(key, value);
-    return key;
+    const key = randomUUID()
+    await stash.set(key, value)
+    return key
   },
-});
+})

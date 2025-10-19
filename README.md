@@ -84,48 +84,42 @@ yarn add kysely-cursor
 ## Quick start
 
 ```ts
-import { Kysely, sql } from "kysely";
-import {
-  createPaginator,
-  PostgresDialect,
-  codecPipe,
-  superJsonCodec,
-  base64Codec,
-} from "kysely-cursor";
+import { Kysely, sql } from 'kysely'
+import { createPaginator, PostgresDialect, codecPipe, superJsonCodec, base64Codec } from 'kysely-cursor'
 
-type DB = { users: { id: string; created_at: Date; email: string } };
+type DB = { users: { id: string; created_at: Date; email: string } }
 
 const db = new Kysely<DB>({
   /* ... */
-});
+})
 
 // Build a codec for page tokens: SuperJSON -> Base64 (opaque & URL safe).
-const cursorCodec = codecPipe(superJsonCodec, base64Codec);
+const cursorCodec = codecPipe(superJsonCodec, base64Codec)
 
 const paginator = createPaginator({
   dialect: PostgresDialect,
   cursorCodec,
-});
+})
 
 const sorts = [
   // nullable leading sorts are allowed, final sort must be non-nullable
-  { col: "users.created_at", dir: "desc", output: "created_at" as const },
-  { col: "users.id", dir: "desc", output: "id" as const },
-] as const;
+  { col: 'users.created_at', dir: 'desc', output: 'created_at' as const },
+  { col: 'users.id', dir: 'desc', output: 'id' as const },
+] as const
 
 const page1 = await paginator.paginate({
-  query: db.selectFrom("users").select(["id", "email", "created_at"]),
+  query: db.selectFrom('users').select(['id', 'email', 'created_at']),
   sorts,
   limit: 25,
-});
+})
 // page1.items, page1.nextPage
 
 const page2 = await paginator.paginate({
-  query: db.selectFrom("users").select(["id", "email", "created_at"]),
+  query: db.selectFrom('users').select(['id', 'email', 'created_at']),
   sorts,
   limit: 25,
   cursor: { nextPage: page1.nextPage! },
-});
+})
 ```
 
 ---
@@ -138,9 +132,9 @@ You must provide an ordered **sort set** that uniquely identifies rows:
 
 ```ts
 const sorts = [
-  { col: "users.created_at", dir: "desc", output: "created_at" as const },
-  { col: "users.id", dir: "desc", output: "id" as const }, // final non-nullable key
-] as const;
+  { col: 'users.created_at', dir: 'desc', output: 'created_at' as const },
+  { col: 'users.id', dir: 'desc', output: 'id' as const }, // final non-nullable key
+] as const
 ```
 
 - Leading sorts may be nullable; the **final sort must be non-nullable** (ensures deterministic ordering).
@@ -186,12 +180,12 @@ Available codecs out of the box:
 ### `createPaginator`
 
 ```ts
-import { createPaginator, PaginatorOptions, Paginator } from "kysely-cursor";
+import { createPaginator, PaginatorOptions, Paginator } from 'kysely-cursor'
 
 const paginator: Paginator = createPaginator({
   dialect, // PaginationDialect
   cursorCodec, // Codec<any, string>
-});
+})
 ```
 
 Returns a simple `{ paginate }` wrapper that injects your defaults.
@@ -203,7 +197,7 @@ Returns a simple `{ paginate }` wrapper that injects your defaults.
 If you prefer, you can call the core function with all options:
 
 ```ts
-import { paginate } from "kysely-cursor";
+import { paginate } from 'kysely-cursor'
 
 const result = await paginate({
   query, // Kysely SelectQueryBuilder
@@ -212,17 +206,17 @@ const result = await paginate({
   cursor, // { nextPage } | { prevPage }
   dialect,
   cursorCodec,
-});
+})
 ```
 
 Returns:
 
 ```ts
 type PaginatedResult<T> = {
-  items: T[];
-  nextPage?: string;
-  prevPage?: string;
-};
+  items: T[]
+  nextPage?: string
+  prevPage?: string
+}
 ```
 
 ---
@@ -231,19 +225,19 @@ type PaginatedResult<T> = {
 
 ```ts
 type PaginationDialect = {
-  applyLimit(builder, limit): builder;
-  applySort(builder, sorts): builder;
-  applyCursor(builder, sorts, cursor): builder;
-};
+  applyLimit(builder, limit): builder
+  applySort(builder, sorts): builder
+  applyCursor(builder, sorts, cursor): builder
+}
 
 type PaginatorOptions = {
-  dialect: PaginationDialect;
-  cursorCodec: Codec<any, string>;
-};
+  dialect: PaginationDialect
+  cursorCodec: Codec<any, string>
+}
 
-type SortDirection = "asc" | "desc";
+type SortDirection = 'asc' | 'desc'
 
-type CursorIncoming = { nextPage: string } | { prevPage: string };
+type CursorIncoming = { nextPage: string } | { prevPage: string }
 ```
 
 A single `PaginationError` class is thrown for user-caused issues (bad tokens, invalid input, etc.).
@@ -256,11 +250,11 @@ A single `PaginationError` class is thrown for user-caused issues (bad tokens, i
 
 ```ts
 const sorts = [
-  { col: "posts.published_at", dir: "desc", output: "published_at" as const },
-  { col: "posts.id", dir: "desc", output: "id" as const },
-] as const;
+  { col: 'posts.published_at', dir: 'desc', output: 'published_at' as const },
+  { col: 'posts.id', dir: 'desc', output: 'id' as const },
+] as const
 
-const page1 = await paginator.paginate({ query: postsQ, sorts, limit: 20 });
+const page1 = await paginator.paginate({ query: postsQ, sorts, limit: 20 })
 
 // forward
 const page2 = await paginator.paginate({
@@ -268,7 +262,7 @@ const page2 = await paginator.paginate({
   sorts,
   limit: 20,
   cursor: { nextPage: page1.nextPage! },
-});
+})
 
 // backward (inverts sorts internally to fetch previous window)
 const backToPage1 = await paginator.paginate({
@@ -276,7 +270,7 @@ const backToPage1 = await paginator.paginate({
   sorts,
   limit: 20,
   cursor: { prevPage: page2.prevPage! },
-});
+})
 ```
 
 ### Custom codec pipelines
@@ -284,32 +278,27 @@ const backToPage1 = await paginator.paginate({
 Make tokens opaque and short by composing codecs:
 
 ```ts
-import {
-  codecPipe,
-  superJsonCodec,
-  base64Codec,
-  createAesCodec,
-} from "kysely-cursor";
+import { codecPipe, superJsonCodec, base64Codec, createAesCodec } from 'kysely-cursor'
 
 const cursorCodec = codecPipe(
   superJsonCodec, // stable serialization for Dates, BigInts
   createAesCodec(process.env.PAGINATION_SECRET!), // encrypt
   base64Codec, // URL-safe string
-);
+)
 ```
 
 Or use external storage:
 
 ```ts
-import { stashCodec } from "kysely-cursor";
+import { stashCodec } from 'kysely-cursor'
 
 const stash = {
   get: async (key: string) => redis.get(`cursor:${key}`)!,
   set: async (key: string, val: string) => {
-    await redis.set(`cursor:${key}`, val, { EX: 3600 });
+    await redis.set(`cursor:${key}`, val, { EX: 3600 })
   },
-};
-const cursorCodec = stashCodec(stash);
+}
+const cursorCodec = stashCodec(stash)
 // Returned tokens look like random UUIDs; payload lives in Redis.
 ```
 
@@ -318,14 +307,13 @@ const cursorCodec = stashCodec(stash);
 Implement the three hooks to support a new database or tweak behavior:
 
 ```ts
-import { baseApplyCursor, PaginationDialect } from "kysely-cursor";
+import { baseApplyCursor, PaginationDialect } from 'kysely-cursor'
 
 export const MyDialect: PaginationDialect = {
   applyLimit: (b, limit) => b.limit(limit),
-  applySort: (b, sorts) =>
-    sorts.reduce((acc, s) => acc.orderBy(s.col as any, s.dir ?? "asc"), b),
+  applySort: (b, sorts) => sorts.reduce((acc, s) => acc.orderBy(s.col as any, s.dir ?? 'asc'), b),
   applyCursor: baseApplyCursor, // reuse the standard predicate builder
-};
+}
 ```
 
 ---

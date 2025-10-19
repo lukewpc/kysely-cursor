@@ -1,18 +1,18 @@
-import type { StartedMySqlContainer } from "@testcontainers/mysql";
-import { MySqlContainer } from "@testcontainers/mysql";
-import { Kysely, MysqlDialect, sql } from "kysely";
-import * as mysql from "mysql2";
-import { afterAll, beforeAll, describe } from "vitest";
+import type { StartedMySqlContainer } from '@testcontainers/mysql'
+import { MySqlContainer } from '@testcontainers/mysql'
+import { Kysely, MysqlDialect, sql } from 'kysely'
+import * as mysql from 'mysql2'
+import { afterAll, beforeAll, describe } from 'vitest'
 
-import { MysqlPaginationDialect } from "~/dialect/mysql.js";
+import { MysqlPaginationDialect } from '~/dialect/mysql.js'
 
-import type { DatabaseConfig, TestDB } from "./shared.js";
-import { createTestData, createTestHelpers, runSharedTests } from "./shared.js";
+import type { DatabaseConfig, TestDB } from './shared.js'
+import { createTestData, createTestHelpers, runSharedTests } from './shared.js'
 
-describe("MySQL pagination helper", () => {
-  let mysqlC: StartedMySqlContainer;
-  let db: Kysely<TestDB>;
-  let pool: mysql.Pool;
+describe('MySQL pagination helper', () => {
+  let mysqlC: StartedMySqlContainer
+  let db: Kysely<TestDB>
+  let pool: mysql.Pool
 
   const config: DatabaseConfig = {
     dialect: MysqlPaginationDialect,
@@ -25,23 +25,23 @@ describe("MySQL pagination helper", () => {
           rating INT NULL,
           active TINYINT(1) NOT NULL DEFAULT 1
         )
-      `.execute(db);
+      `.execute(db)
     },
     insertTestData: async (db, rows) => {
-      await db.insertInto("users").values(rows).execute();
+      await db.insertInto('users').values(rows).execute()
     },
     applySortToQuery: (query, sorts) => {
       for (const s of sorts) {
-        const dir = s.dir ?? "asc";
+        const dir = s.dir ?? 'asc'
         // MSSQL's default NULLS behavior: NULLS FIRST for ASC, NULLS LAST for DESC
-        query = query.orderBy(s.col as any, dir);
+        query = query.orderBy(s.col as any, dir)
       }
-      return query;
+      return query
     },
-  };
+  }
 
   beforeAll(async () => {
-    mysqlC = await new MySqlContainer("mysql:8.4").start();
+    mysqlC = await new MySqlContainer('mysql:8.4').start()
 
     pool = mysql.createPool({
       host: mysqlC.getHost(),
@@ -56,34 +56,34 @@ describe("MySQL pagination helper", () => {
       dateStrings: false,
       // Coerce TINYINT(1) to boolean so `active` is true/false
       typeCast: (field: any, next: () => unknown) => {
-        if (field.type === "TINY" && field.length === 1) {
-          const val = field.string();
-          return val === null ? null : val === "1";
+        if (field.type === 'TINY' && field.length === 1) {
+          const val = field.string()
+          return val === null ? null : val === '1'
         }
-        return next();
+        return next()
       },
-    });
+    })
 
-    const dialect = new MysqlDialect({ pool });
-    db = new Kysely<TestDB>({ dialect });
+    const dialect = new MysqlDialect({ pool })
+    db = new Kysely<TestDB>({ dialect })
 
-    await config.createTable(db);
-    const testData = createTestData();
-    await config.insertTestData(db, testData);
-  }, 60_000);
+    await config.createTable(db)
+    const testData = createTestData()
+    await config.insertTestData(db, testData)
+  }, 60_000)
 
   afterAll(async () => {
-    await db?.destroy().catch(() => {});
+    await db?.destroy().catch(() => {})
     await new Promise<void>((resolve) => {
       // Close mysql2 pool
       if (pool) {
-        pool.end(() => resolve());
+        pool.end(() => resolve())
       } else {
-        resolve();
+        resolve()
       }
-    });
-    await mysqlC?.stop().catch(() => {});
-  });
+    })
+    await mysqlC?.stop().catch(() => {})
+  })
 
-  runSharedTests(() => createTestHelpers(db, config), "mysql");
-});
+  runSharedTests(() => createTestHelpers(db, config), 'mysql')
+})

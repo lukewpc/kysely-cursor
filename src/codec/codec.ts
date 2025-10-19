@@ -11,25 +11,15 @@
  * Inverse transform: turn an output value `O` back into an input value `I`. May be sync or async.
  */
 export type Codec<I = any, O = any> = {
-  encode: (value: I) => Promise<O> | O;
-  decode: (value: O) => Promise<I> | I;
-};
+  encode: (value: I) => Promise<O> | O
+  decode: (value: O) => Promise<I> | I
+}
 
-type InOf<C> = C extends Codec<infer I, any> ? I : never;
-type OutOf<C> = C extends Codec<any, infer O> ? O : never;
+type InOf<C> = C extends Codec<infer I, any> ? I : never
+type OutOf<C> = C extends Codec<any, infer O> ? O : never
 
-type First<T extends readonly unknown[]> = T extends readonly [
-  infer F,
-  ...unknown[],
-]
-  ? F
-  : never;
-type Last<T extends readonly unknown[]> = T extends readonly [
-  ...unknown[],
-  infer L,
-]
-  ? L
-  : never;
+type First<T extends readonly unknown[]> = T extends readonly [infer F, ...unknown[]] ? F : never
+type Last<T extends readonly unknown[]> = T extends readonly [...unknown[], infer L] ? L : never
 
 type Composable<Cs extends readonly Codec[]> = Cs extends readonly []
   ? true
@@ -43,7 +33,7 @@ type Composable<Cs extends readonly Codec[]> = Cs extends readonly []
             : false
           : false
         : false
-      : false;
+      : false
 
 /**
  * Compose a non-empty list of codecs into a single codec.
@@ -56,20 +46,8 @@ type Composable<Cs extends readonly Codec[]> = Cs extends readonly []
  * @param {...Cs} codecs The codecs to compose, in the order their `encode` functions should run.
  * @returns Codec<InOf<First<Cs>>, OutOf<Last<Cs>>> A codec representing the composition, or `never` if the codecs are not type-composable.
  */
-export const codecPipe = <Cs extends readonly [Codec, ...Codec[]]>(
-  ...codecs: Cs
-) =>
+export const codecPipe = <Cs extends readonly [Codec, ...Codec[]]>(...codecs: Cs) =>
   ({
-    encode: (value) =>
-      codecs.reduce(
-        (acc, codec) => acc.then((v) => codec.encode(v)),
-        Promise.resolve(value),
-      ),
-    decode: (value) =>
-      codecs.reduceRight(
-        (acc, codec) => acc.then((v) => codec.decode(v)),
-        Promise.resolve(value),
-      ),
-  }) as Composable<Cs> extends true
-    ? Codec<InOf<First<Cs>>, OutOf<Last<Cs>>>
-    : never;
+    encode: (value) => codecs.reduce((acc, codec) => acc.then((v) => codec.encode(v)), Promise.resolve(value)),
+    decode: (value) => codecs.reduceRight((acc, codec) => acc.then((v) => codec.decode(v)), Promise.resolve(value)),
+  }) as Composable<Cs> extends true ? Codec<InOf<First<Cs>>, OutOf<Last<Cs>>> : never
