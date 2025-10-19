@@ -8,37 +8,37 @@
 
 Cursor‑based (keyset) pagination utilities for [Kysely](https://github.com/kysely-org/kysely).
 
-* Fast, stable page navigation using keyset predicates
-* Built‑in dialects: PostgreSQL, MySQL, MSSQL, SQLite
-* Pluggable **codecs** for opaque, portable, and optionally encrypted page tokens
+- Fast, stable page navigation using keyset predicates
+- Built‑in dialects: PostgreSQL, MySQL, MSSQL, SQLite
+- Pluggable **codecs** for opaque, portable, and optionally encrypted page tokens
 
 ---
 
 ## Table of contents
 
-* [Why keyset pagination?](#why-keyset-pagination)
-* [Features](#features)
-* [Install](#install)
-* [Quick start](#quick-start)
-* [Concepts](#concepts)
-  * [Sorts](#sorts)
-  * [Cursors & tokens](#cursors--tokens)
-  * [Dialects](#dialects)
-  * [Codecs](#codecs)
-* [API](#api)
-  * [`createPaginator`](#createpaginator)
-  * [`paginate` (low-level)](#paginate-low-level)
-  * [Types](#types)
-* [Examples](#examples)
-  * [Forward/back pagination](#forwardback-pagination)
-  * [Offset fallback](#offset-fallback)
-  * [Custom codec pipelines](#custom-codec-pipelines)
-  * [Custom dialects](#custom-dialects)
-* [Error handling](#error-handling)
-* [Security notes](#security-notes)
-* [FAQ](#faq)
-* [Contributing](#contributing)
-* [License](#license)
+- [Why keyset pagination?](#why-keyset-pagination)
+- [Features](#features)
+- [Install](#install)
+- [Quick start](#quick-start)
+- [Concepts](#concepts)
+  - [Sorts](#sorts)
+  - [Cursors & tokens](#cursors--tokens)
+  - [Dialects](#dialects)
+  - [Codecs](#codecs)
+- [API](#api)
+  - [`createPaginator`](#createpaginator)
+  - [`paginate` (low-level)](#paginate-low-level)
+  - [Types](#types)
+- [Examples](#examples)
+  - [Forward/back pagination](#forwardback-pagination)
+  - [Offset fallback](#offset-fallback)
+  - [Custom codec pipelines](#custom-codec-pipelines)
+  - [Custom dialects](#custom-dialects)
+- [Error handling](#error-handling)
+- [Security notes](#security-notes)
+- [FAQ](#faq)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
@@ -48,21 +48,21 @@ Offset/limit pagination (`OFFSET … LIMIT …`) is simple but can be slow and u
 
 **Keyset pagination** derives a cursor from your boundary row’s sort keys (e.g., `(created_at DESC, id DESC)`), yielding:
 
-* **Fast** — index range scans instead of large skips
-* **Stable** — resilient to inserts/deletes between requests
-* **Compact** — opaque, portable tokens instead of raw offsets
+- **Fast** — index range scans instead of large skips
+- **Stable** — resilient to inserts/deletes between requests
+- **Compact** — opaque, portable tokens instead of raw offsets
 
 ---
 
 ## Features
 
-* **Next/previous** page navigation with automatic sort inversion for `prev`.
-* **Offset fallback** via `cursor: { offset: number }` when you must use numeric offsets.
-* **Pluggable codecs** for page tokens: SuperJSON, Base64 URL, AES‑GCM encryption, and external stash storage.
-* **Composable codecs** (`codecPipe`) to build pipelines like `superjson → encrypt → base64url`.
-* **Typed** end‑to‑end with Kysely generics; sort keys map to your selected output.
-* **Helpful errors** (`PaginationError`) for bad input and misconfigurations.
-* **Dialect aware null ordering** consistent with engine semantics.
+- **Next/previous** page navigation with automatic sort inversion for `prev`.
+- **Offset fallback** via `cursor: { offset: number }` when you must use numeric offsets.
+- **Pluggable codecs** for page tokens: SuperJSON, Base64 URL, AES‑GCM encryption, and external stash storage.
+- **Composable codecs** (`codecPipe`) to build pipelines like `superjson → encrypt → base64url`.
+- **Typed** end‑to‑end with Kysely generics; sort keys map to your selected output.
+- **Helpful errors** (`PaginationError`) for bad input and misconfigurations.
+- **Dialect aware null ordering** consistent with engine semantics.
 
 ---
 
@@ -81,8 +81,8 @@ yarn add kysely-cursor
 
 **Peer requirements**
 
-* Node.js 18+
-* Kysely >= 0.28.6
+- Node.js 18+
+- Kysely >= 0.28.6
 
 ---
 
@@ -90,17 +90,13 @@ yarn add kysely-cursor
 
 ```ts
 import { Kysely } from 'kysely'
-import {
-  createPaginator,
-  PostgresPaginationDialect,
-  codecPipe,
-  superJsonCodec,
-  base64UrlCodec,
-} from 'kysely-cursor'
+import { createPaginator, PostgresPaginationDialect, codecPipe, superJsonCodec, base64UrlCodec } from 'kysely-cursor'
 
 type DB = { users: { id: string; created_at: Date; email: string } }
 
-const db = new Kysely<DB>({ /* ... */ })
+const db = new Kysely<DB>({
+  /* ... */
+})
 
 // Build a cursor codec: SuperJSON → Base64 URL (opaque & URL‑safe)
 const cursorCodec = codecPipe(superJsonCodec, base64UrlCodec)
@@ -113,7 +109,7 @@ const paginator = createPaginator({
 const sorts = [
   // nullable leading sorts are allowed; final sort must be non‑nullable
   { col: 'users.created_at', dir: 'desc', output: 'created_at' as const },
-  { col: 'users.id',         dir: 'desc', output: 'id'         as const },
+  { col: 'users.id', dir: 'desc', output: 'id' as const },
 ] as const
 
 const page1 = await paginator.paginate({
@@ -141,36 +137,36 @@ Provide an ordered **sort set** that uniquely identifies rows:
 ```ts
 const sorts = [
   { col: 'users.created_at', dir: 'desc', output: 'created_at' as const },
-  { col: 'users.id',         dir: 'desc', output: 'id'         as const }, // final non‑nullable key
+  { col: 'users.id', dir: 'desc', output: 'id' as const }, // final non‑nullable key
 ] as const
 ```
 
-* Leading sorts may be nullable; the **final sort must be non‑nullable** (ensures deterministic ordering).
-* `output` is the property name in your selected row object. If omitted, it defaults to the last `col` segment (e.g., `users.created_at → created_at`).
+- Leading sorts may be nullable; the **final sort must be non‑nullable** (ensures deterministic ordering).
+- `output` is the property name in your selected row object. If omitted, it defaults to the last `col` segment (e.g., `users.created_at → created_at`).
 
 ### Cursors & tokens
 
-* A **cursor payload** is `{ sig, k }` where:
+- A **cursor payload** is `{ sig, k }` where:
+  - `sig` is a short SHA‑256 signature of your sort spec (prevents mixing tokens across different sort orders);
+  - `k` is a map of sort output keys to the boundary row’s values.
 
-  * `sig` is a short SHA‑256 signature of your sort spec (prevents mixing tokens across different sort orders);
-  * `k` is a map of sort output keys to the boundary row’s values.
-* A **token** is the encoded string representation of that payload (via your **cursor codec**).
+- A **token** is the encoded string representation of that payload (via your **cursor codec**).
 
 ### Dialects
 
 Built‑ins (imported from `kysely-cursor`):
 
-* `PostgresPaginationDialect`
-* `MysqlPaginationDialect`
-* `MssqlPaginationDialect`
-* `SqlitePaginationDialect`
+- `PostgresPaginationDialect`
+- `MysqlPaginationDialect`
+- `MssqlPaginationDialect`
+- `SqlitePaginationDialect`
 
 Each dialect implements:
 
-* `applyLimit(builder, limit, cursorType?)`
-* `applyOffset(builder, offset)`
-* `applySort(builder, sorts)`
-* `applyCursor(builder, sorts, decodedCursor)`
+- `applyLimit(builder, limit, cursorType?)`
+- `applyOffset(builder, offset)`
+- `applySort(builder, sorts)`
+- `applyCursor(builder, sorts, decodedCursor)`
 
 Postgres defaults to `NULLS FIRST` for ascending and `NULLS LAST` for descending to align with the cursor predicate logic. Other dialects emulate sensible null ordering.
 
@@ -178,11 +174,11 @@ Postgres defaults to `NULLS FIRST` for ascending and `NULLS LAST` for descending
 
 Provided:
 
-* `superJsonCodec` — preserves Dates, BigInts, etc.
-* `base64UrlCodec` — UTF‑8 ⇄ Base64 **URL‑safe** strings.
-* `createAesCodec(secret)` — AES‑256‑GCM with scrypt‑derived key and versioned payload (see [Security notes](#security-notes)).
-* `stashCodec(stash)` — stores the raw payload in external storage, returning a random UUID key.
-* `codecPipe(...codecs)` — compose multiple codecs into one.
+- `superJsonCodec` — preserves Dates, BigInts, etc.
+- `base64UrlCodec` — UTF‑8 ⇄ Base64 **URL‑safe** strings.
+- `createAesCodec(secret)` — AES‑256‑GCM with scrypt‑derived key and versioned payload (see [Security notes](#security-notes)).
+- `stashCodec(stash)` — stores the raw payload in external storage, returning a random UUID key.
+- `codecPipe(...codecs)` — compose multiple codecs into one.
 
 The default cursor codec is `codecPipe(superJsonCodec, base64UrlCodec)`.
 
@@ -211,12 +207,12 @@ Returns an object with a single `paginate` method that injects your defaults.
 import { paginate } from 'kysely-cursor'
 
 const result = await paginate({
-  query,      // Kysely SelectQueryBuilder
-  sorts,      // SortSet<DB, TB, O>
-  limit,      // positive integer
-  cursor,     // { nextPage } | { prevPage } | { offset }
-  dialect,    // PaginationDialect
-  cursorCodec // optional
+  query, // Kysely SelectQueryBuilder
+  sorts, // SortSet<DB, TB, O>
+  limit, // positive integer
+  cursor, // { nextPage } | { prevPage } | { offset }
+  dialect, // PaginationDialect
+  cursorCodec, // optional
 })
 ```
 
@@ -239,10 +235,7 @@ export type PaginatedResult<T> = {
 ### Types
 
 ```ts
-export type CursorIncoming =
-  | { nextPage: string }
-  | { prevPage: string }
-  | { offset: number } // numeric offset fallback
+export type CursorIncoming = { nextPage: string } | { prevPage: string } | { offset: number } // numeric offset fallback
 
 export type PaginationDialect = {
   applyLimit: <DB, TB extends keyof DB, O>(
@@ -250,8 +243,14 @@ export type PaginationDialect = {
     limit: number,
     cursorType?: 'next' | 'prev' | 'offset',
   ) => SelectQueryBuilder<DB, TB, O>
-  applyOffset: <DB, TB extends keyof DB, O>(builder: SelectQueryBuilder<DB, TB, O>, offset: number) => SelectQueryBuilder<DB, TB, O>
-  applySort: <DB, TB extends keyof DB, O>(builder: SelectQueryBuilder<DB, TB, O>, sorts: SortSet<DB, TB, O>) => SelectQueryBuilder<DB, TB, O>
+  applyOffset: <DB, TB extends keyof DB, O>(
+    builder: SelectQueryBuilder<DB, TB, O>,
+    offset: number,
+  ) => SelectQueryBuilder<DB, TB, O>
+  applySort: <DB, TB extends keyof DB, O>(
+    builder: SelectQueryBuilder<DB, TB, O>,
+    sorts: SortSet<DB, TB, O>,
+  ) => SelectQueryBuilder<DB, TB, O>
   applyCursor: <DB, TB extends keyof DB, O>(
     builder: SelectQueryBuilder<DB, TB, O>,
     sorts: SortSet<DB, TB, O>,
@@ -277,7 +276,7 @@ A single `PaginationError` class is thrown for expected operational problems (in
 ```ts
 const sorts = [
   { col: 'posts.published_at', dir: 'desc', output: 'published_at' as const },
-  { col: 'posts.id',           dir: 'desc', output: 'id'           as const },
+  { col: 'posts.id', dir: 'desc', output: 'id' as const },
 ] as const
 
 const page1 = await paginator.paginate({ query: postsQ, sorts, limit: 20 })
@@ -320,9 +319,9 @@ Make tokens opaque and short:
 import { codecPipe, superJsonCodec, base64UrlCodec, createAesCodec } from 'kysely-cursor'
 
 const cursorCodec = codecPipe(
-  superJsonCodec,                              // stable serialization (Date, BigInt, etc.)
+  superJsonCodec, // stable serialization (Date, BigInt, etc.)
   createAesCodec(process.env.PAGINATION_SECRET!), // encrypt
-  base64UrlCodec,                              // URL‑safe string
+  base64UrlCodec, // URL‑safe string
 )
 ```
 
@@ -333,7 +332,9 @@ import { stashCodec } from 'kysely-cursor'
 
 const stash = {
   get: async (key: string) => redis.get(`cursor:${key}`)!,
-  set: async (key: string, val: string) => { await redis.set(`cursor:${key}`, val, { EX: 3600 }) },
+  set: async (key: string, val: string) => {
+    await redis.set(`cursor:${key}`, val, { EX: 3600 })
+  },
 }
 
 const cursorCodec = stashCodec(stash)
@@ -361,13 +362,13 @@ export const MyDialect: PaginationDialect = {
 
 Operational errors are thrown as `PaginationError` (with optional `cause`):
 
-* `Invalid page size limit`
-* `Cannot paginate without sorting`
-* `Invalid cursor`
-* `Page token does not match sort order`
-* `Sort index out of bounds`
-* `Missing pagination cursor value for "key"`
-* `Failed to paginate` (DB/driver error wrapped as `cause`)
+- `Invalid page size limit`
+- `Cannot paginate without sorting`
+- `Invalid cursor`
+- `Page token does not match sort order`
+- `Sort index out of bounds`
+- `Missing pagination cursor value for "key"`
+- `Failed to paginate` (DB/driver error wrapped as `cause`)
 
 Treat these as **400 Bad Request** unless the `cause` indicates an internal failure.
 
@@ -377,15 +378,15 @@ Treat these as **400 Bad Request** unless the `cause` indicates an internal fail
 
 `createAesCodec(secret)` implements **AES‑256‑GCM** with:
 
-* Key derivation via **scrypt** (`N=2^15, r=8, p=1`) from your secret and a random 16‑byte salt
-* Random 12‑byte IV and 16‑byte auth tag
-* Payload layout: `version (1) | salt (16) | iv (12) | tag (16) | ciphertext`, Base64‑encoded (URL‑safe if you additionally wrap with `base64UrlCodec`)
+- Key derivation via **scrypt** (`N=2^15, r=8, p=1`) from your secret and a random 16‑byte salt
+- Random 12‑byte IV and 16‑byte auth tag
+- Payload layout: `version (1) | salt (16) | iv (12) | tag (16) | ciphertext`, Base64‑encoded (URL‑safe if you additionally wrap with `base64UrlCodec`)
 
 **Recommendations**
 
-* Keep `PAGINATION_SECRET` long and random
-* Consider version rotation if you change parameters
-* Prefer encrypting or stashing tokens if they include sensitive values (emails, internal IDs)
+- Keep `PAGINATION_SECRET` long and random
+- Consider version rotation if you change parameters
+- Prefer encrypting or stashing tokens if they include sensitive values (emails, internal IDs)
 
 ---
 
