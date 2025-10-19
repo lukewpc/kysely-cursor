@@ -27,7 +27,7 @@ export type SortItem<DB, TB extends keyof DB, O, Allowed> = {
 
 type Sortable = string | number | boolean | Date | bigint
 
-export type SortSet<DB, TB extends keyof DB, O> = [
+export type SortSet<DB, TB extends keyof DB, O> = readonly [
   ...SortItem<DB, TB, O, Sortable | null>[], // nullable leading sorts
   SortItem<DB, TB, O, Sortable>, // non-null final sort
 ]

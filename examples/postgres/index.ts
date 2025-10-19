@@ -54,11 +54,16 @@ async function main() {
       { col: 'created_at', dir: 'desc' },
       { col: 'id', dir: 'desc' }, // final non-nullable sort for deterministic ordering
     ] as const
+    const limit = 5
 
     const query = db.selectFrom('users').select(['id', 'name', 'created_at'])
 
     // Page 1
-    const page1 = await paginator.paginate({ query, sorts, limit: 5 })
+    const page1 = await paginator.paginate({
+      query,
+      sorts,
+      limit,
+    })
     console.log('\nPage 1:')
     console.table(page1.items.map((r) => ({ id: r.id, name: r.name, created_at: r.created_at })))
     console.log('nextPage:', page1.nextPage ? `${page1.nextPage.slice(0, 24)}…` : undefined)
@@ -68,7 +73,7 @@ async function main() {
       const page2 = await paginator.paginate({
         query,
         sorts,
-        limit: 5,
+        limit,
         cursor: { nextPage: page1.nextPage },
       })
       console.log('\nPage 2 (forward):')
@@ -80,7 +85,7 @@ async function main() {
         const backTo1 = await paginator.paginate({
           query,
           sorts,
-          limit: 5,
+          limit,
           cursor: { prevPage: page2.prevPage },
         })
         console.log('\nBack to Page 1 (backward):')

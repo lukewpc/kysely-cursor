@@ -68,7 +68,7 @@ export const paginate = async <DB, TB extends keyof DB, O, S extends SortSet<DB,
   }
 }
 
-const assertLimitSorts = (limit: number, sorts: unknown[]) => {
+const assertLimitSorts = (limit: number, sorts: readonly unknown[]) => {
   if (!(Number.isInteger(limit) && limit > 0)) throw new PaginationError('Invalid page size limit')
   if (!Array.isArray(sorts) || sorts.length < 1) throw new PaginationError('Cannot paginate without sorting')
 }
@@ -77,4 +77,4 @@ const invertSorts = <S extends SortSet<any, any, any>>(sorts: S): S =>
   sorts.map((s) => ({
     ...s,
     dir: applyDefaultDirection(s.dir) === 'desc' ? 'asc' : 'desc',
-  })) as S
+  })) as unknown as S
