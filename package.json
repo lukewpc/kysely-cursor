@@ -31,10 +31,12 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --check .",
     "format:fix": "prettier --write .",
+    "prepack": "pnpm run build",
     "prepublishOnly": "pnpm run build",
     "changeset": "changeset",
     "changeset:version": "changeset version",
-    "changeset:publish": "changeset publish"
+    "changeset:publish": "changeset publish",
+    "example:postgres": "pnpm --filter kysely-cursor-example-postgres dev"
   },
   "keywords": [
     "kysely",

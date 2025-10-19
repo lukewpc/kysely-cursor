@@ -1,0 +1,17 @@
+{
+  "name": "kysely-cursor-example-postgres",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx index.ts"
+  },
+  "dependencies": {
+    "kysely-cursor": "workspace:*",
+    "kysely": "^0.28.7",
+    "pg": "^8.11.5"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.9.3"
+  }
+}

@@ -5,7 +5,7 @@ import simpleImportSort from 'eslint-plugin-simple-import-sort'
 import tseslint from 'typescript-eslint'
 
 export default defineConfig(
-  globalIgnores(['node_modules/**', 'dist/**']),
+  globalIgnores(['node_modules/**', 'dist/**', 'examples/**']),
   js.configs.recommended,
   tseslint.configs.recommended,
   {
