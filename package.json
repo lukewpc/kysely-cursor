@@ -24,7 +24,7 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsup -c tsconfig.build.json",
+    "build": "tsup",
     "clean": "rm -rf dist",
     "test": "vitest run --coverage",
     "typecheck": "tsc -p tsconfig.json --noEmit",
