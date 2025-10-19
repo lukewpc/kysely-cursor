@@ -55,7 +55,7 @@ importers:
         specifier: ^12.1.1
         version: 12.1.1(eslint@9.38.0)
       kysely:
-        specifier: ^0.28.7
+        specifier: ^0.28.8
         version: 0.28.8
       mssql:
         specifier: ^10.0.2

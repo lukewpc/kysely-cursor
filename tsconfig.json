@@ -1,16 +1,4 @@
 {
-  "compilerOptions": {
-    "module": "nodenext",
-    "target": "es2022",
-    "noUncheckedIndexedAccess": true,
-    "strict": true,
-    "noUncheckedSideEffectImports": true,
-    "moduleDetection": "force",
-    "skipLibCheck": true,
-    "baseUrl": "src",
-    "types": ["vitest/globals"],
-    "paths": {
-      "~/*": ["./*"]
-    }
-  }
+  "extends": "./tsconfig.build.json",
+  "include": ["src/**/*.ts", "test/**/*.ts"]
 }
