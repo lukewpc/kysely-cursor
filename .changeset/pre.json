@@ -5,6 +5,7 @@
     "kysely-cursor": "0.0.1"
   },
   "changesets": [
+    "light-corners-write",
     "upset-zoos-ask"
   ]
 }
