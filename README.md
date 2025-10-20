@@ -5,6 +5,7 @@
 [![NPM Version](https://img.shields.io/npm/v/kysely-cursor?style=flat&label=latest)](https://github.com/lukewpc/kysely-cursor/releases/latest)
 [![Tests](https://github.com/lukewpc/kysely-cursor/actions/workflows/ci.yml/badge.svg)](https://github.com/lukewpc/kysely-cursor)
 [![License](https://img.shields.io/github/license/lukewpc/kysely-cursor?style=flat)](https://github.com/lukewpc/kysely-cursor/blob/master/LICENSE)
+[![Coverage](https://codecov.io/gh/lukewpc/kysely-cursor/branch/main/graph/badge.svg)](https://codecov.io/gh/lukewpc/kysely-cursor)
 
 Cursor‑based (keyset) pagination utilities for [Kysely](https://github.com/kysely-org/kysely).
 
@@ -22,9 +23,9 @@ Cursor‑based (keyset) pagination utilities for [Kysely](https://github.com/kys
 - [Quick start](#quick-start)
 - [Concepts](#concepts)
   - [Sorts](#sorts)
-  - [Cursors & tokens](#cursors--tokens)
   - [Dialects](#dialects)
   - [Codecs](#codecs)
+  - [Null Sorting Behavior](#null-sorting-behavior)
 - [API](#api)
   - [`createPaginator`](#createpaginator)
   - [`paginate` (low-level)](#paginate-low-level)
@@ -37,16 +38,16 @@ Cursor‑based (keyset) pagination utilities for [Kysely](https://github.com/kys
 - [Error handling](#error-handling)
 - [Security notes](#security-notes)
 - [FAQ](#faq)
-- [Contributing](#contributing)
-- [License](#license)
 
 ---
 
 ## Why keyset pagination?
 
-Offset/limit pagination (`OFFSET … LIMIT …`) is simple but can be slow and unstable on large tables: later pages get progressively slower; concurrent writes can skip/duplicate rows; offsets leak collection size.
+Offset/limit pagination (`OFFSET … LIMIT …`) is simple but can be slow and unstable on large tables: later pages get
+progressively slower; concurrent writes can skip/duplicate rows; offsets leak collection size.
 
-**Keyset pagination** derives a cursor from your boundary row’s sort keys (e.g., `(created_at DESC, id DESC)`), yielding:
+**Keyset pagination** derives a cursor from your boundary row’s sort keys (e.g., `(created_at DESC, id DESC)`),
+yielding:
 
 - **Fast** — index range scans instead of large skips
 - **Stable** — resilient to inserts/deletes between requests
@@ -107,9 +108,9 @@ const paginator = createPaginator({
 })
 
 const sorts = [
-  // nullable leading sorts are allowed; final sort must be non‑nullable
-  { col: 'users.created_at', dir: 'desc', output: 'created_at' as const },
-  { col: 'users.id', dir: 'desc', output: 'id' as const },
+  // nullable leading sorts are allowed; final sort must be unique & non‑nullable
+  { col: 'users.created_at', dir: 'desc', output: 'created_at' },
+  { col: 'users.id', dir: 'desc', output: 'id' },
 ] as const
 
 const page1 = await paginator.paginate({
@@ -136,21 +137,17 @@ Provide an ordered **sort set** that uniquely identifies rows:
 
 ```ts
 const sorts = [
-  { col: 'users.created_at', dir: 'desc', output: 'created_at' as const },
-  { col: 'users.id', dir: 'desc', output: 'id' as const }, // final non‑nullable key
+  { col: 'users.created_at', dir: 'desc', output: 'created_at' },
+  { col: 'users.id', dir: 'desc', output: 'id' }, // final non‑nullable & unique key
 ] as const
 ```
 
-- Leading sorts may be nullable; the **final sort must be non‑nullable** (ensures deterministic ordering).
-- `output` is the property name in your selected row object. If omitted, it defaults to the last `col` segment (e.g., `users.created_at → created_at`).
-
-### Cursors & tokens
-
-- A **cursor payload** is `{ sig, k }` where:
-  - `sig` is a short SHA‑256 signature of your sort spec (prevents mixing tokens across different sort orders);
-  - `k` is a map of sort output keys to the boundary row’s values.
-
-- A **token** is the encoded string representation of that payload (via your **cursor codec**).
+- Leading sorts take precedence over later sorts.
+- Leading sorts may be nullable; the **final sort must be non‑nullable & unique**.
+- Use a primary key or a unique index for the final sort, this acts as a tie-breaker.
+- `dir` is the sort direction. Defaults to `asc`.
+- `col` is the field to sort by, optionally qualified.
+- `output` is the field name in your outputted rows. Defaults to `col`, without the qualifying prefix. May need to be explicitly set if your `col` is aliased in your select statement.
 
 ### Dialects
 
@@ -168,19 +165,49 @@ Each dialect implements:
 - `applySort(builder, sorts)`
 - `applyCursor(builder, sorts, decodedCursor)`
 
-Postgres defaults to `NULLS FIRST` for ascending and `NULLS LAST` for descending to align with the cursor predicate logic. Other dialects emulate sensible null ordering.
+Postgres defaults to `NULLS FIRST` for ascending and `NULLS LAST` for descending to align with the cursor predicate
+logic. Other dialects emulate sensible null ordering.
 
 ### Codecs
+
+Codec are used to encode and decode the cursor to an opaque string. You can compose multiple codecs into a pipeline.
 
 Provided:
 
 - `superJsonCodec` — preserves Dates, BigInts, etc.
 - `base64UrlCodec` — UTF‑8 ⇄ Base64 **URL‑safe** strings.
-- `createAesCodec(secret)` — AES‑256‑GCM with scrypt‑derived key and versioned payload (see [Security notes](#security-notes)).
+- `createAesCodec(secret)` — AES‑256‑GCM with scrypt‑derived key and versioned payload (
+  see [Security notes](#security-notes)).
 - `stashCodec(stash)` — stores the raw payload in external storage, returning a random UUID key.
 - `codecPipe(...codecs)` — compose multiple codecs into one.
 
 The default cursor codec is `codecPipe(superJsonCodec, base64UrlCodec)`.
+
+### Null Sorting Behavior
+
+Handling of `NULL` values during sorting differs between database engines.
+To ensure consistent pagination behavior across dialects, this library **normalizes** null sorting rules.
+
+| Database System                  | Default NULLs (ASC) | Default NULLs (DESC) | Supports `NULLS FIRST / LAST`? |
+| -------------------------------- | ------------------- | -------------------- | ------------------------------ |
+| **MySQL**                        | NULLs **first**     | NULLs **last**       | ❌ Not supported               |
+| **PostgreSQL**                   | NULLs **last**      | NULLs **first**      | ✅ Fully supported             |
+| **Microsoft SQL Server (MSSQL)** | NULLs **first**     | NULLs **last**       | ❌ Not supported               |
+| **SQLite**                       | NULLs **first**     | NULLs **last**       | ✅ Supported since 3.30.0      |
+
+#### Current behavior
+
+Because **PostgreSQL** is the _odd one out_ (sorting NULLs last on ascending by default),
+this library **inverts Postgres’s null ordering** to match the behaviour of the other supported dialects:
+
+- Ascending (`ASC`) → `NULLS FIRST`
+- Descending (`DESC`) → `NULLS LAST`
+
+This ensures consistent cursor pagination semantics across all engines, even when nullable sort keys are involved.
+
+#### Future plans
+
+In a future release, customizable null sorting behavior may be introduced for dialects that support `NULLS FIRST` / `NULLS LAST` natively (e.g. PostgreSQL, SQLite).
 
 ---
 
@@ -275,8 +302,8 @@ A single `PaginationError` class is thrown for expected operational problems (in
 
 ```ts
 const sorts = [
-  { col: 'posts.published_at', dir: 'desc', output: 'published_at' as const },
-  { col: 'posts.id', dir: 'desc', output: 'id' as const },
+  { col: 'posts.published_at', dir: 'desc', output: 'published_at' },
+  { col: 'posts.id', dir: 'desc', output: 'id' },
 ] as const
 
 const page1 = await paginator.paginate({ query: postsQ, sorts, limit: 20 })
@@ -380,7 +407,8 @@ Treat these as **400 Bad Request** unless the `cause` indicates an internal fail
 
 - Key derivation via **scrypt** (`N=2^15, r=8, p=1`) from your secret and a random 16‑byte salt
 - Random 12‑byte IV and 16‑byte auth tag
-- Payload layout: `version (1) | salt (16) | iv (12) | tag (16) | ciphertext`, Base64‑encoded (URL‑safe if you additionally wrap with `base64UrlCodec`)
+- Payload layout: `version (1) | salt (16) | iv (12) | tag (16) | ciphertext`, Base64‑encoded (URL‑safe if you
+  additionally wrap with `base64UrlCodec`)
 
 **Recommendations**
 
@@ -393,16 +421,19 @@ Treat these as **400 Bad Request** unless the `cause` indicates an internal fail
 ## FAQ
 
 **Why do tokens break if I change the sort order?**
-Tokens include a signature of the sort spec. If it doesn’t match, decoding fails with `Page token does not match sort order` to prevent mixing tokens across screens.
+Tokens include a signature of the sort spec. If it doesn’t match, decoding fails with
+`Page token does not match sort order` to prevent mixing tokens across screens.
 
 **Do I have to include `output`?**
-No. If omitted, the last path segment of `col` is used (e.g., `users.created_at → created_at`). Use `output` when the selected column alias differs from the DB column.
+No. If omitted, the last path segment of `col` is used (e.g., `users.created_at → created_at`). Use `output` when the
+selected column alias differs from the DB column.
 
 **Can the first page expose `prevPage`?**
-The library over‑fetches by `limit+1` to determine if there’s another page. You’ll get `prevPage` once you’ve moved forward; an empty result returns no tokens.
+The library over‑fetches by `limit+1` to determine if there’s another page. You’ll get `prevPage` once you’ve moved
+forward; an empty result returns no tokens.
 
 **How are NULLs handled?**
-Ascending sorts treat NULLs first; descending sorts push NULLs last, matching the cursor predicate builder. MSSQL/MySQL/SQLite emulate sensible behavior.
+Ascending sorts treat NULLs first; descending sorts push NULLs last.
 
 ---
 
