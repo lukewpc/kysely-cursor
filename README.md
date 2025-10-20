@@ -7,7 +7,6 @@
 [![License](https://img.shields.io/github/license/lukewpc/kysely-cursor?style=flat)](https://github.com/lukewpc/kysely-cursor/blob/master/LICENSE)
 [![Coverage](https://codecov.io/gh/lukewpc/kysely-cursor/branch/main/graph/badge.svg)](https://codecov.io/gh/lukewpc/kysely-cursor)
 
-
 Cursor‑based (keyset) pagination utilities for [Kysely](https://github.com/kysely-org/kysely).
 
 - Fast, stable page navigation using keyset predicates
@@ -24,19 +23,19 @@ Cursor‑based (keyset) pagination utilities for [Kysely](https://github.com/kys
 - [Quick start](#quick-start)
 - [Limitations](#limitations)
 - [Concepts](#concepts)
-    - [Sorts](#sorts)
-    - [Cursors & tokens](#cursors--tokens)
-    - [Dialects](#dialects)
-    - [Codecs](#codecs)
+  - [Sorts](#sorts)
+  - [Cursors & tokens](#cursors--tokens)
+  - [Dialects](#dialects)
+  - [Codecs](#codecs)
 - [API](#api)
-    - [`createPaginator`](#createpaginator)
-    - [`paginate` (low-level)](#paginate-low-level)
-    - [Types](#types)
+  - [`createPaginator`](#createpaginator)
+  - [`paginate` (low-level)](#paginate-low-level)
+  - [Types](#types)
 - [Examples](#examples)
-    - [Forward/back pagination](#forwardback-pagination)
-    - [Offset fallback](#offset-fallback)
-    - [Custom codec pipelines](#custom-codec-pipelines)
-    - [Custom dialects](#custom-dialects)
+  - [Forward/back pagination](#forwardback-pagination)
+  - [Offset fallback](#offset-fallback)
+  - [Custom codec pipelines](#custom-codec-pipelines)
+  - [Custom dialects](#custom-dialects)
 - [Error handling](#error-handling)
 - [Security notes](#security-notes)
 - [FAQ](#faq)
@@ -111,8 +110,8 @@ const paginator = createPaginator({
 
 const sorts = [
   // nullable leading sorts are allowed; final sort must be non‑nullable
-  {col: 'users.created_at', dir: 'desc', output: 'created_at' as const},
-  {col: 'users.id', dir: 'desc', output: 'id' as const},
+  { col: 'users.created_at', dir: 'desc', output: 'created_at' as const },
+  { col: 'users.id', dir: 'desc', output: 'id' as const },
 ] as const
 
 const page1 = await paginator.paginate({
@@ -125,7 +124,7 @@ const page2 = await paginator.paginate({
   query: db.selectFrom('users').select(['id', 'email', 'created_at']),
   sorts,
   limit: 25,
-  cursor: {nextPage: page1.nextPage!},
+  cursor: { nextPage: page1.nextPage! },
 })
 ```
 
@@ -137,19 +136,19 @@ Handling of `NULL` values during sorting differs between database engines.
 To ensure consistent pagination behavior across dialects, this library **normalizes** null sorting rules.
 
 | Database System                  | Default NULLs (ASC) | Default NULLs (DESC) | Supports `NULLS FIRST / LAST`? |
-|----------------------------------|---------------------|----------------------|--------------------------------|
-| **MySQL**                        | NULLs **first**     | NULLs **last**       | ❌ Not supported                |
-| **PostgreSQL**                   | NULLs **last**      | NULLs **first**      | ✅ Fully supported              |
-| **Microsoft SQL Server (MSSQL)** | NULLs **first**     | NULLs **last**       | ❌ Not supported                |
-| **SQLite**                       | NULLs **first**     | NULLs **last**       | ✅ Supported since 3.30.0       |
+| -------------------------------- | ------------------- | -------------------- | ------------------------------ |
+| **MySQL**                        | NULLs **first**     | NULLs **last**       | ❌ Not supported               |
+| **PostgreSQL**                   | NULLs **last**      | NULLs **first**      | ✅ Fully supported             |
+| **Microsoft SQL Server (MSSQL)** | NULLs **first**     | NULLs **last**       | ❌ Not supported               |
+| **SQLite**                       | NULLs **first**     | NULLs **last**       | ✅ Supported since 3.30.0      |
 
 ### Current behavior
 
-Because **PostgreSQL** is the *odd one out* (sorting NULLs last on ascending by default),
+Because **PostgreSQL** is the _odd one out_ (sorting NULLs last on ascending by default),
 this library **inverts Postgres’s null ordering** to match the behaviour of the other supported dialects:
 
-* Ascending (`ASC`) → `NULLS FIRST`
-* Descending (`DESC`) → `NULLS LAST`
+- Ascending (`ASC`) → `NULLS FIRST`
+- Descending (`DESC`) → `NULLS LAST`
 
 This ensures consistent cursor pagination semantics across all engines, even when nullable sort keys are involved.
 
@@ -167,8 +166,8 @@ Provide an ordered **sort set** that uniquely identifies rows:
 
 ```ts
 const sorts = [
-  {col: 'users.created_at', dir: 'desc', output: 'created_at' as const},
-  {col: 'users.id', dir: 'desc', output: 'id' as const}, // final non‑nullable key
+  { col: 'users.created_at', dir: 'desc', output: 'created_at' as const },
+  { col: 'users.id', dir: 'desc', output: 'id' as const }, // final non‑nullable key
 ] as const
 ```
 
@@ -179,8 +178,8 @@ const sorts = [
 ### Cursors & tokens
 
 - A **cursor payload** is `{ sig, k }` where:
-    - `sig` is a short SHA‑256 signature of your sort spec (prevents mixing tokens across different sort orders);
-    - `k` is a map of sort output keys to the boundary row’s values.
+  - `sig` is a short SHA‑256 signature of your sort spec (prevents mixing tokens across different sort orders);
+  - `k` is a map of sort output keys to the boundary row’s values.
 
 - A **token** is the encoded string representation of that payload (via your **cursor codec**).
 
@@ -309,18 +308,18 @@ A single `PaginationError` class is thrown for expected operational problems (in
 
 ```ts
 const sorts = [
-  {col: 'posts.published_at', dir: 'desc', output: 'published_at' as const},
-  {col: 'posts.id', dir: 'desc', output: 'id' as const},
+  { col: 'posts.published_at', dir: 'desc', output: 'published_at' as const },
+  { col: 'posts.id', dir: 'desc', output: 'id' as const },
 ] as const
 
-const page1 = await paginator.paginate({query: postsQ, sorts, limit: 20})
+const page1 = await paginator.paginate({ query: postsQ, sorts, limit: 20 })
 
 // forward
 const page2 = await paginator.paginate({
   query: postsQ,
   sorts,
   limit: 20,
-  cursor: {nextPage: page1.nextPage!},
+  cursor: { nextPage: page1.nextPage! },
 })
 
 // backward (internally inverts sorts to walk back)
@@ -328,7 +327,7 @@ const backToPage1 = await paginator.paginate({
   query: postsQ,
   sorts,
   limit: 20,
-  cursor: {prevPage: page2.prevPage!},
+  cursor: { prevPage: page2.prevPage! },
 })
 ```
 
@@ -341,7 +340,7 @@ const page3 = await paginator.paginate({
   query: postsQ,
   sorts,
   limit: 20,
-  cursor: {offset: 40}, // skip first 40 rows (page index * limit)
+  cursor: { offset: 40 }, // skip first 40 rows (page index * limit)
 })
 ```
 
@@ -367,7 +366,7 @@ import { stashCodec } from 'kysely-cursor'
 const stash = {
   get: async (key: string) => redis.get(`cursor:${key}`)!,
   set: async (key: string, val: string) => {
-    await redis.set(`cursor:${key}`, val, {EX: 3600})
+    await redis.set(`cursor:${key}`, val, { EX: 3600 })
   },
 }
 
