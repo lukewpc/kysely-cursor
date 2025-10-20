@@ -21,12 +21,11 @@ Cursor‑based (keyset) pagination utilities for [Kysely](https://github.com/kys
 - [Features](#features)
 - [Install](#install)
 - [Quick start](#quick-start)
-- [Limitations](#limitations)
 - [Concepts](#concepts)
   - [Sorts](#sorts)
-  - [Cursors & tokens](#cursors--tokens)
   - [Dialects](#dialects)
   - [Codecs](#codecs)
+  - [Null Sorting Behavior](#null-sorting-behavior)
 - [API](#api)
   - [`createPaginator`](#createpaginator)
   - [`paginate` (low-level)](#paginate-low-level)
@@ -109,9 +108,9 @@ const paginator = createPaginator({
 })
 
 const sorts = [
-  // nullable leading sorts are allowed; final sort must be non‑nullable
-  { col: 'users.created_at', dir: 'desc', output: 'created_at' as const },
-  { col: 'users.id', dir: 'desc', output: 'id' as const },
+  // nullable leading sorts are allowed; final sort must be unique & non‑nullable
+  { col: 'users.created_at', dir: 'desc', output: 'created_at' },
+  { col: 'users.id', dir: 'desc', output: 'id' },
 ] as const
 
 const page1 = await paginator.paginate({
@@ -130,34 +129,6 @@ const page2 = await paginator.paginate({
 
 ---
 
-## Null Sorting Behavior
-
-Handling of `NULL` values during sorting differs between database engines.
-To ensure consistent pagination behavior across dialects, this library **normalizes** null sorting rules.
-
-| Database System                  | Default NULLs (ASC) | Default NULLs (DESC) | Supports `NULLS FIRST / LAST`? |
-| -------------------------------- | ------------------- | -------------------- | ------------------------------ |
-| **MySQL**                        | NULLs **first**     | NULLs **last**       | ❌ Not supported               |
-| **PostgreSQL**                   | NULLs **last**      | NULLs **first**      | ✅ Fully supported             |
-| **Microsoft SQL Server (MSSQL)** | NULLs **first**     | NULLs **last**       | ❌ Not supported               |
-| **SQLite**                       | NULLs **first**     | NULLs **last**       | ✅ Supported since 3.30.0      |
-
-### Current behavior
-
-Because **PostgreSQL** is the _odd one out_ (sorting NULLs last on ascending by default),
-this library **inverts Postgres’s null ordering** to match the behaviour of the other supported dialects:
-
-- Ascending (`ASC`) → `NULLS FIRST`
-- Descending (`DESC`) → `NULLS LAST`
-
-This ensures consistent cursor pagination semantics across all engines, even when nullable sort keys are involved.
-
-### Future plans
-
-In a future release, customizable null sorting behavior may be introduced for dialects that support `NULLS FIRST` / `NULLS LAST` natively (e.g. PostgreSQL, SQLite).
-
----
-
 ## Concepts
 
 ### Sorts
@@ -166,22 +137,17 @@ Provide an ordered **sort set** that uniquely identifies rows:
 
 ```ts
 const sorts = [
-  { col: 'users.created_at', dir: 'desc', output: 'created_at' as const },
-  { col: 'users.id', dir: 'desc', output: 'id' as const }, // final non‑nullable key
+  { col: 'users.created_at', dir: 'desc', output: 'created_at' },
+  { col: 'users.id', dir: 'desc', output: 'id' }, // final non‑nullable & unique key
 ] as const
 ```
 
-- Leading sorts may be nullable; the **final sort must be non‑nullable** (ensures deterministic ordering).
-- `output` is the property name in your selected row object. If omitted, it defaults to the last `col` segment (e.g.,
-  `users.created_at → created_at`).
-
-### Cursors & tokens
-
-- A **cursor payload** is `{ sig, k }` where:
-  - `sig` is a short SHA‑256 signature of your sort spec (prevents mixing tokens across different sort orders);
-  - `k` is a map of sort output keys to the boundary row’s values.
-
-- A **token** is the encoded string representation of that payload (via your **cursor codec**).
+- Leading sorts take precedence over later sorts.
+- Leading sorts may be nullable; the **final sort must be non‑nullable & unique**.
+- Use a primary key or a unique index for the final sort, this acts as a tie-breaker.
+- `dir` is the sort direction. Defaults to `asc`.
+- `col` is the field to sort by, optionally qualified.
+- `output` is the field name in your outputted rows. Defaults to `col`, without the qualifying prefix. May need to be explicitly set if your `col` is aliased in your select statement.
 
 ### Dialects
 
@@ -204,6 +170,8 @@ logic. Other dialects emulate sensible null ordering.
 
 ### Codecs
 
+Codec are used to encode and decode the cursor to an opaque string. You can compose multiple codecs into a pipeline.
+
 Provided:
 
 - `superJsonCodec` — preserves Dates, BigInts, etc.
@@ -214,6 +182,32 @@ Provided:
 - `codecPipe(...codecs)` — compose multiple codecs into one.
 
 The default cursor codec is `codecPipe(superJsonCodec, base64UrlCodec)`.
+
+### Null Sorting Behavior
+
+Handling of `NULL` values during sorting differs between database engines.
+To ensure consistent pagination behavior across dialects, this library **normalizes** null sorting rules.
+
+| Database System                  | Default NULLs (ASC) | Default NULLs (DESC) | Supports `NULLS FIRST / LAST`? |
+| -------------------------------- | ------------------- | -------------------- | ------------------------------ |
+| **MySQL**                        | NULLs **first**     | NULLs **last**       | ❌ Not supported               |
+| **PostgreSQL**                   | NULLs **last**      | NULLs **first**      | ✅ Fully supported             |
+| **Microsoft SQL Server (MSSQL)** | NULLs **first**     | NULLs **last**       | ❌ Not supported               |
+| **SQLite**                       | NULLs **first**     | NULLs **last**       | ✅ Supported since 3.30.0      |
+
+#### Current behavior
+
+Because **PostgreSQL** is the _odd one out_ (sorting NULLs last on ascending by default),
+this library **inverts Postgres’s null ordering** to match the behaviour of the other supported dialects:
+
+- Ascending (`ASC`) → `NULLS FIRST`
+- Descending (`DESC`) → `NULLS LAST`
+
+This ensures consistent cursor pagination semantics across all engines, even when nullable sort keys are involved.
+
+#### Future plans
+
+In a future release, customizable null sorting behavior may be introduced for dialects that support `NULLS FIRST` / `NULLS LAST` natively (e.g. PostgreSQL, SQLite).
 
 ---
 
@@ -308,8 +302,8 @@ A single `PaginationError` class is thrown for expected operational problems (in
 
 ```ts
 const sorts = [
-  { col: 'posts.published_at', dir: 'desc', output: 'published_at' as const },
-  { col: 'posts.id', dir: 'desc', output: 'id' as const },
+  { col: 'posts.published_at', dir: 'desc', output: 'published_at' },
+  { col: 'posts.id', dir: 'desc', output: 'id' },
 ] as const
 
 const page1 = await paginator.paginate({ query: postsQ, sorts, limit: 20 })
