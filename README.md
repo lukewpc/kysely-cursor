@@ -385,14 +385,6 @@ export const MyDialect: PaginationDialect = {
 
 ---
 
-## Error handling
-
-Operational errors are thrown as `PaginationError` (with optional `cause`):
-
-Here’s a concise, accurate update to your **README** section on error handling, aligned with your new structured `PaginationError` design:
-
----
-
 ## Error Handling
 
 All operational errors are thrown as a `PaginationError` with a consistent structure:
