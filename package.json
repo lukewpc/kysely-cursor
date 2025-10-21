@@ -27,6 +27,7 @@
     "build": "tsup",
     "clean": "rm -rf dist",
     "test": "vitest run --coverage --typecheck.enabled",
+    "fix": "pnpm lint:fix && pnpm format:fix",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

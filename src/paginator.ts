@@ -35,7 +35,8 @@ export const paginate = async <DB, TB extends keyof DB, O, S extends SortSet<DB,
         q = dialect.applyOffset(q, decodedCursor.offset)
       } else {
         const sig = sortSignature(sorts)
-        if (decodedCursor.payload.sig !== sig) throw new PaginationError('Page token does not match sort order')
+        if (decodedCursor.payload.sig !== sig)
+          throw new PaginationError({ message: 'Page token does not match sort order', code: 'INVALID_TOKEN' })
 
         q = dialect.applyCursor(q, sortsApplied, decodedCursor)
       }
@@ -64,13 +65,15 @@ export const paginate = async <DB, TB extends keyof DB, O, S extends SortSet<DB,
     }
   } catch (error) {
     if (error instanceof PaginationError) throw error
-    throw new PaginationError('Failed to paginate', { cause: error as Error })
+    throw new PaginationError({ message: 'Failed to paginate', cause: error as Error, code: 'UNEXPECTED_ERROR' })
   }
 }
 
 const assertLimitSorts = (limit: number, sorts: readonly unknown[]) => {
-  if (!(Number.isInteger(limit) && limit > 0)) throw new PaginationError('Invalid page size limit')
-  if (!Array.isArray(sorts) || sorts.length < 1) throw new PaginationError('Cannot paginate without sorting')
+  if (!(Number.isInteger(limit) && limit > 0))
+    throw new PaginationError({ message: 'Invalid page size limit', code: 'INVALID_LIMIT' })
+  if (!Array.isArray(sorts) || sorts.length < 1)
+    throw new PaginationError({ message: 'Cannot paginate without sorting', code: 'INVALID_SORT' })
 }
 
 const invertSorts = <S extends SortSet<any, any, any>>(sorts: S): S =>

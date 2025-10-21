@@ -1,7 +1,5 @@
 # Kysely Cursor
 
-### Warning: this project is in early stages and may be unstable
-
 [![NPM Version](https://img.shields.io/npm/v/kysely-cursor?style=flat&label=latest)](https://github.com/lukewpc/kysely-cursor/releases/latest)
 [![Tests](https://github.com/lukewpc/kysely-cursor/actions/workflows/ci.yml/badge.svg)](https://github.com/lukewpc/kysely-cursor)
 [![License](https://img.shields.io/github/license/lukewpc/kysely-cursor?style=flat)](https://github.com/lukewpc/kysely-cursor/blob/master/LICENSE)
@@ -88,6 +86,8 @@ yarn add kysely-cursor
 ---
 
 ## Quick start
+
+### Warning: this project is in early development, so does not support cross-version token compatiablity
 
 ```ts
 import { Kysely } from 'kysely'
@@ -389,15 +389,23 @@ export const MyDialect: PaginationDialect = {
 
 Operational errors are thrown as `PaginationError` (with optional `cause`):
 
-- `Invalid page size limit`
-- `Cannot paginate without sorting`
-- `Invalid cursor`
-- `Page token does not match sort order`
-- `Sort index out of bounds`
-- `Missing pagination cursor value for "key"`
-- `Failed to paginate` (DB/driver error wrapped as `cause`)
+Here’s a concise, accurate update to your **README** section on error handling, aligned with your new structured `PaginationError` design:
 
-Treat these as **400 Bad Request** unless the `cause` indicates an internal failure.
+---
+
+## Error Handling
+
+All operational errors are thrown as a `PaginationError` with a consistent structure:
+
+```ts
+{
+  message: string
+  code: ErrorCode
+  cause?: Error
+}
+```
+
+Treat these as **400 Bad Request** unless the `code` indicates an internal failure.
 
 ---
 

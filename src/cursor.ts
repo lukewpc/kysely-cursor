@@ -47,7 +47,7 @@ export const decodeCursor = async (cursor: CursorIncoming, keysetCodec: Codec<an
     }
   if ('offset' in cursor) return { type: 'offset', offset: cursor.offset }
 
-  throw new PaginationError('Invalid cursor')
+  throw new PaginationError({ message: 'Invalid cursor', code: 'INVALID_TOKEN' })
 }
 
 const decodeCursorPayload = async (token: string, keysetCodec: Codec<any, string>) => {
@@ -110,12 +110,16 @@ export const buildCursorPredicateRecursive = <DB, TB extends keyof DB, S extends
   idx = 0,
 ): ExpressionWrapper<DB, TB, SqlBool> => {
   const sort = sorts[idx]
-  if (!sort) throw new PaginationError('Sort index out of bounds')
+  if (!sort) throw new PaginationError({ message: 'Sort index out of bounds', code: 'UNEXPECTED_ERROR' })
 
   const dir = applyDefaultDirection(sort.dir)
   const col = sort.col as ReferenceExpression<DB, TB>
   const key = getSortOutput(sort)
-  if (!(key in decoded.k)) throw new PaginationError(`Missing pagination cursor value for "${key}"`)
+  if (!(key in decoded.k))
+    throw new PaginationError({
+      message: `Missing pagination cursor value for "${key}"`,
+      code: 'INVALID_TOKEN',
+    })
 
   const value = decoded.k[key]
   const cmp = dir === 'desc' ? '<' : '>'

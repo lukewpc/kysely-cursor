@@ -1,5 +1,16 @@
+export type ErrorCode = 'INVALID_TOKEN' | 'INVALID_SORT' | 'INVALID_LIMIT' | 'UNEXPECTED_ERROR'
+
+type ErrorOpts = {
+  message: string
+  code: ErrorCode
+  cause?: Error
+}
+
 export class PaginationError extends Error {
-  constructor(message: string, options: { cause?: Error } = {}) {
-    super(message, options)
+  code: ErrorCode
+
+  constructor(opts: ErrorOpts) {
+    super(opts.message, { cause: opts.cause })
+    this.code = opts.code
   }
 }
