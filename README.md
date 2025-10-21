@@ -27,14 +27,11 @@ Cursor‑based (keyset) pagination utilities for [Kysely](https://github.com/kys
 - [API](#api)
   - [`createPaginator`](#createpaginator)
   - [`paginate` (low-level)](#paginate-low-level)
-  - [Types](#types)
 - [Examples](#examples)
   - [Forward/back pagination](#forwardback-pagination)
   - [Offset fallback](#offset-fallback)
   - [Custom codec pipelines](#custom-codec-pipelines)
-  - [Custom dialects](#custom-dialects)
 - [Error handling](#error-handling)
-- [Security notes](#security-notes)
 - [FAQ](#faq)
 
 ---
@@ -158,19 +155,9 @@ Built‑ins (imported from `kysely-cursor`):
 - `MssqlPaginationDialect`
 - `SqlitePaginationDialect`
 
-Each dialect implements:
-
-- `applyLimit(builder, limit, cursorType?)`
-- `applyOffset(builder, offset)`
-- `applySort(builder, sorts)`
-- `applyCursor(builder, sorts, decodedCursor)`
-
-Postgres defaults to `NULLS FIRST` for ascending and `NULLS LAST` for descending to align with the cursor predicate
-logic. Other dialects emulate sensible null ordering.
-
 ### Codecs
 
-Codec are used to encode and decode the cursor to an opaque string. You can compose multiple codecs into a pipeline.
+Codecs are used to encode and decode the cursor to an opaque string. You can compose multiple codecs into a pipeline.
 
 Provided:
 
@@ -259,43 +246,6 @@ export type PaginatedResult<T> = {
 
 ---
 
-### Types
-
-```ts
-export type CursorIncoming = { nextPage: string } | { prevPage: string } | { offset: number } // numeric offset fallback
-
-export type PaginationDialect = {
-  applyLimit: <DB, TB extends keyof DB, O>(
-    builder: SelectQueryBuilder<DB, TB, O>,
-    limit: number,
-    cursorType?: 'next' | 'prev' | 'offset',
-  ) => SelectQueryBuilder<DB, TB, O>
-  applyOffset: <DB, TB extends keyof DB, O>(
-    builder: SelectQueryBuilder<DB, TB, O>,
-    offset: number,
-  ) => SelectQueryBuilder<DB, TB, O>
-  applySort: <DB, TB extends keyof DB, O>(
-    builder: SelectQueryBuilder<DB, TB, O>,
-    sorts: SortSet<DB, TB, O>,
-  ) => SelectQueryBuilder<DB, TB, O>
-  applyCursor: <DB, TB extends keyof DB, O>(
-    builder: SelectQueryBuilder<DB, TB, O>,
-    sorts: SortSet<DB, TB, O>,
-    cursor: { type: 'next' | 'prev'; payload: any },
-  ) => SelectQueryBuilder<DB, TB, O>
-}
-
-export type PaginatorOptions = {
-  dialect: PaginationDialect
-  /** Defaults to `codecPipe(superJsonCodec, base64UrlCodec)` */
-  cursorCodec?: Codec<any, string>
-}
-```
-
-A single `PaginationError` class is thrown for expected operational problems (invalid input, bad token, etc.).
-
----
-
 ## Examples
 
 ### Forward/back pagination
@@ -368,21 +318,6 @@ const cursorCodec = stashCodec(stash)
 // Returned tokens look like random UUIDs; payload is stored in Redis.
 ```
 
-### Custom dialects
-
-Implement the hooks to support another database or to tweak behavior:
-
-```ts
-import { baseApplyCursor, type PaginationDialect } from 'kysely-cursor'
-
-export const MyDialect: PaginationDialect = {
-  applyLimit: (b, limit) => b.limit(limit),
-  applyOffset: (b, offset) => b.offset(offset),
-  applySort: (b, sorts) => sorts.reduce((acc, s) => acc.orderBy(s.col as any, s.dir ?? 'asc'), b),
-  applyCursor: baseApplyCursor, // reuse the standard predicate builder
-}
-```
-
 ---
 
 ## Error Handling
@@ -398,23 +333,6 @@ All operational errors are thrown as a `PaginationError` with a consistent struc
 ```
 
 Treat these as **400 Bad Request** unless the `code` indicates an internal failure.
-
----
-
-## Security notes
-
-`createAesCodec(secret)` implements **AES‑256‑GCM** with:
-
-- Key derivation via **scrypt** (`N=2^15, r=8, p=1`) from your secret and a random 16‑byte salt
-- Random 12‑byte IV and 16‑byte auth tag
-- Payload layout: `version (1) | salt (16) | iv (12) | tag (16) | ciphertext`, Base64‑encoded (URL‑safe if you
-  additionally wrap with `base64UrlCodec`)
-
-**Recommendations**
-
-- Keep `PAGINATION_SECRET` long and random
-- Consider version rotation if you change parameters
-- Prefer encrypting or stashing tokens if they include sensitive values (emails, internal IDs)
 
 ---
 
