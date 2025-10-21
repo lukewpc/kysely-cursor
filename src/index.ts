@@ -16,7 +16,7 @@ export { SqlitePaginationDialect } from './dialect/sqlite.js'
 export { baseApplyCursor, buildCursorPredicateRecursive, CursorIncoming } from './cursor.js'
 
 // error
-export { PaginationError } from './error.js'
+export { ErrorCode, PaginationError } from './error.js'
 
 // paginator
 export { createPaginator } from './paginator.js'

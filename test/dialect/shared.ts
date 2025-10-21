@@ -230,6 +230,26 @@ export const runSharedTests = (createHelpers: () => ReturnType<typeof createTest
     await expect(page(3, sortsB, first.nextPage)).rejects.toThrowError(/Page token does not match sort order/i)
   })
 
+  it('throws when page token is missing required cursor key(s)', async () => {
+    const { fetchAllPlainSorted, page } = createHelpers()
+    const sorts: SortSet<TestDB, 'users', TestRow> = [
+      { col: 'users.created_at', dir: 'asc' },
+      { col: 'users.id', dir: 'asc' },
+    ]
+
+    const expected = await fetchAllPlainSorted(sorts)
+    const first = expected[0]!
+
+    const payload = resolveCursor(first, sorts)
+    // remove a required key to simulate a token with a valid signature but missing data
+    delete (payload as any).k.id
+
+    const codec = codecPipe(superJsonCodec, base64UrlCodec)
+    const malformedToken = await codec.encode(payload)
+
+    await expect(page(5, sorts, malformedToken)).rejects.toThrowError(/Missing pagination cursor value for "id"/i)
+  })
+
   it('can paginate with a boolean sort and a secondary tie-breaker', async () => {
     const { fetchAllPlainSorted, page } = createHelpers()
     const sorts: SortSet<TestDB, 'users', TestRow> = [
