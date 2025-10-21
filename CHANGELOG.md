@@ -1,5 +1,11 @@
 # kysely-cursor
 
+## 0.0.3
+
+### Patch Changes
+
+- ec220b0: Improve errors
+
 ## 0.0.2
 
 ### Patch Changes
