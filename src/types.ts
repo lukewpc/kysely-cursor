@@ -1,7 +1,7 @@
 import type { SelectQueryBuilder } from 'kysely'
 
 import type { Codec } from './codec/codec.js'
-import type { CursorIncoming, CursorOutgoing, DecodedCursorNextPrev } from './cursor.js'
+import type { CursorIncoming, CursorOutgoing, DecodedCursorNextPrev, EdgeOutgoing } from './cursor.js'
 import type { SortSet } from './sorting.js'
 
 export type PaginationDialect = {
@@ -46,8 +46,15 @@ export type PaginatedResult<T> = {
   hasPrevPage: boolean
 } & CursorOutgoing
 
+export type PaginatedResultWithEdges<T> = Omit<PaginatedResult<T>, 'items'> & {
+  edges: EdgeOutgoing<T>[]
+}
+
 export type Paginator = {
   paginate: <DB, TB extends keyof DB, O, S extends SortSet<DB, TB, O>>(
     args: PaginateArgs<DB, TB, O, S>,
   ) => Promise<PaginatedResult<O>>
+  paginateWithEdges: <DB, TB extends keyof DB, O, S extends SortSet<DB, TB, O>>(
+    args: PaginateArgs<DB, TB, O, S>,
+  ) => Promise<PaginatedResultWithEdges<O>>
 }

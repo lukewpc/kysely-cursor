@@ -211,7 +211,7 @@ const paginator: Paginator = createPaginator({
 })
 ```
 
-Returns an object with a single `paginate` method that injects your defaults.
+Returns an object with `paginate` and `paginateWithEdges` methods that injects your defaults.
 
 ---
 
@@ -235,6 +235,43 @@ const result = await paginate({
 ```ts
 export type PaginatedResult<T> = {
   items: T[]
+  startCursor?: string
+  endCursor?: string
+  nextPage?: string
+  prevPage?: string
+  hasNextPage: boolean
+  hasPrevPage: boolean
+}
+```
+
+---
+
+### `paginateWithEdges` (low-level)
+
+Identical to above, except it will return an array of `edges` that contain every
+item with a correlated `cursor`.
+
+```ts
+import { paginateWithEdges } from 'kysely-cursor'
+
+const result = await paginateWithEdges({
+  query, // Kysely SelectQueryBuilder
+  sorts, // SortSet<DB, TB, O>
+  limit, // positive integer
+  cursor, // { nextPage } | { prevPage } | { offset }
+  dialect, // PaginationDialect
+  cursorCodec, // optional
+})
+```
+
+**Return value**
+
+```ts
+export type PaginatedResult<T> = {
+  edges: {
+    node: T
+    cursor: string
+  }[]
   startCursor?: string
   endCursor?: string
   nextPage?: string

@@ -4,7 +4,7 @@ import { base64UrlCodec } from '~/codec/base64Url.js'
 import { codecPipe } from '~/codec/codec.js'
 import { superJsonCodec } from '~/codec/superJson.js'
 import { decodeCursor, resolveCursor } from '~/cursor.js'
-import { paginate } from '~/paginator.js'
+import { paginate, paginateWithEdges } from '~/paginator.js'
 import type { SortSet } from '~/sorting.js'
 import type { PaginationDialect } from '~/types.js'
 
@@ -106,5 +106,19 @@ describe('paginate (runtime)', () => {
 
   it('throws on invalid cursor', async () => {
     await expect(decodeCursor({ invalid: 'invalid' } as any, cursorCodec)).rejects.toThrow(/Invalid cursor/i)
+  })
+})
+
+describe('paginateWithEdges (runtime)', () => {
+  it('handles empty result sets (no rows)', async () => {
+    const builder = makeBuilder<DB, 'users', UserRow>([]) // no rows
+    const res = await paginateWithEdges({
+      query: builder,
+      sorts: validSortsQualifiedOnly,
+      limit: 10,
+      dialect: TestDialect,
+    })
+    expect(res.edges).toEqual([])
+    expect(res.nextPage).toBeUndefined()
   })
 })

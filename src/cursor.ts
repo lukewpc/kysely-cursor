@@ -82,6 +82,27 @@ export const resolvePageTokens = async (
   }
 }
 
+export type EdgeOutgoing<T> = {
+  node: T
+  cursor: string
+}
+
+export const resolveEdges = async <O>(
+  rows: O[],
+  sorts: SortSet<any, any, any>,
+  cursorCodec: Codec<any, string>,
+): Promise<EdgeOutgoing<O>[]> => {
+  // if no rows, return no edges
+  if (rows.length === 0) return []
+
+  return await Promise.all(
+    rows.map(async (row) => {
+      const cursor = await cursorCodec.encode(resolveCursor(row, sorts))
+      return { node: row, cursor }
+    })
+  )
+}
+
 export const getSortOutput = (sort: SortItem<any, any, any, any>) =>
   'output' in sort ? sort.output : sort.col.split('.').at(-1)!
 
