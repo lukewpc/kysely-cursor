@@ -99,7 +99,7 @@ export const resolveEdges = async <O>(
     rows.map(async (row) => {
       const cursor = await cursorCodec.encode(resolveCursor(row, sorts))
       return { node: row, cursor }
-    })
+    }),
   )
 }
 

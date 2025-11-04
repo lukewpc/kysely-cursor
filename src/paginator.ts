@@ -52,7 +52,7 @@ export const paginate = async <DB, TB extends keyof DB, O, S extends SortSet<DB,
       sorts,
       cursorCodec,
       decodedCursor,
-      rows.length > limit
+      rows.length > limit,
     )
 
     return {
@@ -70,20 +70,18 @@ export const paginate = async <DB, TB extends keyof DB, O, S extends SortSet<DB,
   }
 }
 
-export const paginateWithEdges = async <DB, TB extends keyof DB, O, S extends SortSet<DB, TB, O>>(args: PaginateArgs<DB, TB, O, S> & PaginatorOptions): Promise<PaginatedResultWithEdges<O>> => {
-  const { sorts, cursorCodec = DEFAULT_CURSOR_CODEC, } = args
+export const paginateWithEdges = async <DB, TB extends keyof DB, O, S extends SortSet<DB, TB, O>>(
+  args: PaginateArgs<DB, TB, O, S> & PaginatorOptions,
+): Promise<PaginatedResultWithEdges<O>> => {
+  const { sorts, cursorCodec = DEFAULT_CURSOR_CODEC } = args
   const { items, ...paginated } = await paginate(args)
 
   try {
-    const edges = await resolveEdges(
-      items,
-      sorts,
-      cursorCodec
-    )
+    const edges = await resolveEdges(items, sorts, cursorCodec)
 
     return {
       ...paginated,
-      edges
+      edges,
     }
   } catch (error) {
     if (error instanceof PaginationError) throw error
