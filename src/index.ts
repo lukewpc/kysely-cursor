@@ -13,11 +13,18 @@ export { PostgresPaginationDialect } from './dialect/postgres.js'
 export { SqlitePaginationDialect } from './dialect/sqlite.js'
 
 // cursor
-export { baseApplyCursor, buildCursorPredicateRecursive, CursorIncoming } from './cursor.js'
+export { baseApplyCursor, buildCursorPredicateRecursive, CursorIncoming, EdgeOutgoing } from './cursor.js'
 
 // error
 export { ErrorCode, PaginationError } from './error.js'
 
 // paginator
-export { createPaginator } from './paginator.js'
-export type { PaginateArgs, PaginatedResult, PaginationDialect, Paginator, PaginatorOptions } from './types.js'
+export { createPaginator, paginate, paginateWithEdges } from './paginator.js'
+export type {
+  PaginateArgs,
+  PaginatedResult,
+  PaginatedResultWithEdges,
+  PaginationDialect,
+  Paginator,
+  PaginatorOptions,
+} from './types.js'
