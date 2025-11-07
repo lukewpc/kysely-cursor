@@ -15,24 +15,31 @@ Cursor‑based (keyset) pagination utilities for [Kysely](https://github.com/kys
 
 ## Table of contents
 
-- [Why keyset pagination?](#why-keyset-pagination)
-- [Features](#features)
-- [Install](#install)
-- [Quick start](#quick-start)
-- [Concepts](#concepts)
-  - [Sorts](#sorts)
-  - [Dialects](#dialects)
-  - [Codecs](#codecs)
-  - [Null Sorting Behavior](#null-sorting-behavior)
-- [API](#api)
-  - [`createPaginator`](#createpaginator)
-  - [`paginate` (low-level)](#paginate-low-level)
-- [Examples](#examples)
-  - [Forward/back pagination](#forwardback-pagination)
-  - [Offset fallback](#offset-fallback)
-  - [Custom codec pipelines](#custom-codec-pipelines)
-- [Error handling](#error-handling)
-- [FAQ](#faq)
+- [Kysely Cursor](#kysely-cursor)
+  - [Table of contents](#table-of-contents)
+  - [Why keyset pagination?](#why-keyset-pagination)
+  - [Features](#features)
+  - [Install](#install)
+  - [Quick start](#quick-start)
+    - [Warning: this project is in early development, so does not support cross-version token compatiablity](#warning-this-project-is-in-early-development-so-does-not-support-cross-version-token-compatiablity)
+  - [Concepts](#concepts)
+    - [Sorts](#sorts)
+    - [Dialects](#dialects)
+    - [Codecs](#codecs)
+    - [Null Sorting Behavior](#null-sorting-behavior)
+      - [Current behavior](#current-behavior)
+      - [Future plans](#future-plans)
+  - [API](#api)
+    - [`createPaginator`](#createpaginator)
+    - [`paginate` (low-level)](#paginate-low-level)
+    - [`paginateWithEdges` (low-level)](#paginatewithedges-low-level)
+  - [Examples](#examples)
+    - [Forward/back pagination](#forwardback-pagination)
+    - [Offset fallback](#offset-fallback)
+    - [Custom codec pipelines](#custom-codec-pipelines)
+  - [Error Handling](#error-handling)
+  - [FAQ](#faq)
+    - [Acknowledgements](#acknowledgements)
 
 ---
 
@@ -267,7 +274,7 @@ const result = await paginateWithEdges({
 **Return value**
 
 ```ts
-export type PaginatedResult<T> = {
+export type PaginatedResultWithEdges<T> = {
   edges: {
     node: T
     cursor: string
