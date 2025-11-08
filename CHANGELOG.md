@@ -1,5 +1,11 @@
 # kysely-cursor
 
+## 0.1.0
+
+### Minor Changes
+
+- ab6c849: Add `paginateWithEdges` method, returning a cursor and node (item) for each row
+
 ## 0.0.3
 
 ### Patch Changes

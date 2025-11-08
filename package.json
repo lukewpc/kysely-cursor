@@ -1,6 +1,6 @@
 {
   "name": "kysely-cursor",
-  "version": "0.0.3",
+  "version": "0.1.0",
   "type": "module",
   "description": "Cursor based pagination utils for Kysely",
   "repository": {
