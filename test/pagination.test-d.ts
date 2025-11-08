@@ -1,10 +1,12 @@
 import type { SelectQueryBuilder } from 'kysely'
 
+import type { EdgeOutgoing } from '~/cursor.js'
+
 import { MssqlPaginationDialect } from '../src/dialect/mssql.js'
 import { PostgresPaginationDialect } from '../src/dialect/postgres.js'
 import { createPaginator } from '../src/index.js'
 import type { SortSet } from '../src/sorting.js'
-import type { PaginatedResult } from '../src/types.js'
+import type { PaginatedResult, PaginatedResultWithEdges } from '../src/types.js'
 
 type UserRow = {
   id: number
@@ -164,5 +166,20 @@ describe('paginate (type-level)', () => {
 
     // @ts-expect-error - missing final non-nullable item
     const _onlyNullable: SortSet<DB, 'users', UserRow> = [{ col: 'users.name', output: 'name' }]
+  })
+})
+
+describe('paginateWithEdges (type-level)', () => {
+  it('returns PaginatedResultWithEdges<O> with correct item type', async () => {
+    const builder = makeBuilder<DB, 'users', UserRow>([])
+    const paginator = createPaginator({ dialect: PostgresPaginationDialect })
+    const res = await paginator.paginateWithEdges<DB, 'users', UserRow, typeof validSortsAscId>({
+      query: builder,
+      sorts: validSortsAscId,
+      limit: 10,
+    })
+    expectTypeOf(res).toEqualTypeOf<PaginatedResultWithEdges<UserRow>>()
+    expectTypeOf(res.edges).toEqualTypeOf<EdgeOutgoing<UserRow>[]>()
+    expectTypeOf(res.nextPage).toEqualTypeOf<string | undefined>()
   })
 })

@@ -1,16 +1,17 @@
 import { base64UrlCodec } from './codec/base64Url.js'
 import { codecPipe } from './codec/codec.js'
 import { superJsonCodec } from './codec/superJson.js'
-import { decodeCursor, resolvePageTokens, sortSignature } from './cursor.js'
+import { decodeCursor, resolveEdges, resolvePageTokens, sortSignature } from './cursor.js'
 import { PaginationError } from './error.js'
 import type { SortSet } from './sorting.js'
 import { applyDefaultDirection } from './sorting.js'
-import type { PaginateArgs, PaginatedResult, Paginator, PaginatorOptions } from './types.js'
+import type { PaginateArgs, PaginatedResult, PaginatedResultWithEdges, Paginator, PaginatorOptions } from './types.js'
 
 const DEFAULT_CURSOR_CODEC = codecPipe(superJsonCodec, base64UrlCodec)
 
 export const createPaginator = (opts: PaginatorOptions): Paginator => ({
   paginate: (args) => paginate({ ...args, ...opts }),
+  paginateWithEdges: (args) => paginateWithEdges({ ...args, ...opts }),
 })
 
 export const paginate = async <DB, TB extends keyof DB, O, S extends SortSet<DB, TB, O>>({
@@ -66,6 +67,25 @@ export const paginate = async <DB, TB extends keyof DB, O, S extends SortSet<DB,
   } catch (error) {
     if (error instanceof PaginationError) throw error
     throw new PaginationError({ message: 'Failed to paginate', cause: error as Error, code: 'UNEXPECTED_ERROR' })
+  }
+}
+
+export const paginateWithEdges = async <DB, TB extends keyof DB, O, S extends SortSet<DB, TB, O>>(
+  args: PaginateArgs<DB, TB, O, S> & PaginatorOptions,
+): Promise<PaginatedResultWithEdges<O>> => {
+  const { sorts, cursorCodec = DEFAULT_CURSOR_CODEC } = args
+  const { items, ...paginated } = await paginate(args)
+
+  try {
+    const edges = await resolveEdges(items, sorts, cursorCodec)
+
+    return {
+      ...paginated,
+      edges,
+    }
+  } catch (error) {
+    if (error instanceof PaginationError) throw error
+    throw new PaginationError({ message: 'Failed to generate edges', cause: error as Error, code: 'UNEXPECTED_ERROR' })
   }
 }
 
