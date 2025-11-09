@@ -2,11 +2,11 @@ import type { SelectQueryBuilder } from 'kysely'
 
 import type { EdgeOutgoing } from '~/cursor.js'
 
-import { MssqlPaginationDialect } from '../src/dialect/mssql.js'
-import { PostgresPaginationDialect } from '../src/dialect/postgres.js'
+import { MssqlPaginationDialect } from '~/dialect/mssql.js'
+import { PostgresPaginationDialect } from '~/dialect/postgres.js'
 import { createPaginator } from '../src/index.js'
-import type { SortSet } from '../src/sorting.js'
-import type { PaginatedResult, PaginatedResultWithEdges } from '../src/types.js'
+import type { SortSet } from '~/sorting.js'
+import type { PaginatedResult, PaginatedResultWithEdges } from '~/types.js'
 
 type UserRow = {
   id: number
@@ -20,7 +20,7 @@ type DB = {
   users: UserRow
 }
 
-function makeBuilder<DB, TB extends keyof DB, O>(rows: O[]): SelectQueryBuilder<DB, TB, O> {
+function makeBuilder<DB, TB extends keyof DB,O>(rows: O[]): SelectQueryBuilder<DB, TB, O> {
   const self = {
     limit(_: number) {
       return self as unknown as SelectQueryBuilder<DB, TB, O>
@@ -74,7 +74,7 @@ const _emptySortsDisallowed: SortSet<DB, 'users', UserRow> = []
 describe('paginate (type-level)', () => {
   it('returns PaginatedResult<O> with correct item type', async () => {
     const builder = makeBuilder<DB, 'users', UserRow>([])
-    const paginator = createPaginator({ dialect: PostgresPaginationDialect })
+    const paginator = createPaginator({ dialect: new PostgresPaginationDialect() })
     const res = await paginator.paginate<DB, 'users', UserRow, typeof validSortsAscId>({
       query: builder,
       sorts: validSortsAscId,
@@ -87,8 +87,8 @@ describe('paginate (type-level)', () => {
 
   it('accepts both dialects and rejects unknown dialect strings at compile time', async () => {
     const builder = makeBuilder<DB, 'users', UserRow>([])
-    const pgPaginator = createPaginator({ dialect: PostgresPaginationDialect })
-    const msPaginator = createPaginator({ dialect: MssqlPaginationDialect })
+    const pgPaginator = createPaginator({ dialect: new PostgresPaginationDialect() })
+    const msPaginator = createPaginator({ dialect: new MssqlPaginationDialect() })
 
     await pgPaginator.paginate<DB, 'users', UserRow, typeof validSortsQualifiedOnly>({
       query: builder,
@@ -108,7 +108,7 @@ describe('paginate (type-level)', () => {
 
   it('supports nullable leading sorts and enforces non-nullable final sort', async () => {
     const builder = makeBuilder<DB, 'users', UserRow>([])
-    const paginator = createPaginator({ dialect: PostgresPaginationDialect })
+    const paginator = createPaginator({ dialect: new PostgresPaginationDialect() })
     await paginator.paginate<DB, 'users', UserRow, typeof validSortsAscId>({
       query: builder,
       sorts: validSortsAscId,
@@ -124,7 +124,7 @@ describe('paginate (type-level)', () => {
 
   it('accepts bigint and other supported sortable value domains', async () => {
     const builder = makeBuilder<DB, 'users', UserRow>([])
-    const paginator = createPaginator({ dialect: MssqlPaginationDialect })
+    const paginator = createPaginator({ dialect: new MssqlPaginationDialect() })
     await paginator.paginate<DB, 'users', UserRow, typeof validSortsWithBigint>({
       query: builder,
       sorts: validSortsWithBigint,
@@ -135,7 +135,7 @@ describe('paginate (type-level)', () => {
   it('infers item type via ExtractPaginatedItem helper', async () => {
     const builder = makeBuilder<DB, 'users', UserRow>([])
 
-    const paginator = createPaginator({ dialect: PostgresPaginationDialect })
+    const paginator = createPaginator({ dialect: new PostgresPaginationDialect() })
     const _run = () =>
       paginator.paginate<DB, 'users', UserRow, typeof validSortsAscId>({
         query: builder,
@@ -149,7 +149,7 @@ describe('paginate (type-level)', () => {
 
   it('supports using only qualified col to derive output key', async () => {
     const builder = makeBuilder<DB, 'users', UserRow>([])
-    const paginator = createPaginator({ dialect: PostgresPaginationDialect })
+    const paginator = createPaginator({ dialect: new PostgresPaginationDialect() })
     await paginator.paginate<DB, 'users', UserRow, typeof validSortsQualifiedOnly>({
       query: builder,
       sorts: validSortsQualifiedOnly,
@@ -172,7 +172,7 @@ describe('paginate (type-level)', () => {
 describe('paginateWithEdges (type-level)', () => {
   it('returns PaginatedResultWithEdges<O> with correct item type', async () => {
     const builder = makeBuilder<DB, 'users', UserRow>([])
-    const paginator = createPaginator({ dialect: PostgresPaginationDialect })
+    const paginator = createPaginator({ dialect: new PostgresPaginationDialect() })
     const res = await paginator.paginateWithEdges<DB, 'users', UserRow, typeof validSortsAscId>({
       query: builder,
       sorts: validSortsAscId,

@@ -10,16 +10,17 @@ describe('SQLite pagination helper', () => {
   let db: Kysely<TestDB>
 
   const config: DatabaseConfig = {
-    dialect: SqlitePaginationDialect,
+    dialect: new SqlitePaginationDialect(),
     createTable: async (db) => {
       await sql`
-        CREATE TABLE users (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL,
-          created_at TEXT NOT NULL,
-          rating INTEGER NULL,
-          active INTEGER NOT NULL DEFAULT 1
-        )
+          CREATE TABLE users
+          (
+              id         INTEGER PRIMARY KEY AUTOINCREMENT,
+              name       TEXT    NOT NULL,
+              created_at TEXT    NOT NULL,
+              rating     INTEGER NULL,
+              active     INTEGER NOT NULL DEFAULT 1
+          )
       `.execute(db)
     },
     insertTestData: async (db, rows) => {
@@ -48,8 +49,8 @@ describe('SQLite pagination helper', () => {
 
   beforeAll(async () => {
     const sqlite = new BetterSqlite3(':memory:')
-    const dialect = new SqliteDialect({ database: sqlite })
-    db = new Kysely<TestDB>({ dialect })
+    const dialect = new SqliteDialect({database: sqlite})
+    db = new Kysely<TestDB>({dialect})
 
     await config.createTable(db)
     const testData = createTestData()
@@ -57,12 +58,13 @@ describe('SQLite pagination helper', () => {
   })
 
   afterAll(async () => {
-    await db?.destroy().catch(() => {})
+    await db?.destroy().catch(() => {
+    })
   })
 
   const createCoercingHelpers = () => {
     const base = createTestHelpers(db, config)
-    const coerce = (r: any) => ({ ...r, active: r.active === 1 || r.active === true })
+    const coerce = (r: any) => ({...r, active: r.active === 1 || r.active === true})
     return {
       ...base,
       fetchAllPlainSorted: async (sorts: any) => {
@@ -71,7 +73,7 @@ describe('SQLite pagination helper', () => {
       },
       page: async (limit: number, sorts: any, token?: string) => {
         const res = await base.page(limit, sorts, token)
-        return { ...res, items: res.items.map(coerce) }
+        return {...res, items: res.items.map(coerce)}
       },
     }
   }

@@ -14,7 +14,7 @@ describe('MySQL pagination helper', () => {
   let pool: mysql.Pool
 
   const config: DatabaseConfig = {
-    dialect: MysqlPaginationDialect,
+    dialect: new MysqlPaginationDialect(),
     createTable: async (db) => {
       await sql`
         CREATE TABLE users (

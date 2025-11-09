@@ -1,26 +1,16 @@
-import type { OrderByExpression, SelectQueryBuilder } from 'kysely'
-
-import { baseApplyCursor } from '../cursor.js'
-import type { SortSet } from '../sorting.js'
-import type { PaginationDialect } from '../types.js'
+import type { SelectQueryBuilder } from 'kysely'
+import { BasePaginationDialect } from '~/dialect/base.js'
 
 /**
  * A dialect for SQL Server
  */
-export const MssqlPaginationDialect: PaginationDialect = {
-  applyLimit: (builder, limit, cursorType) => (cursorType === 'offset' ? builder.fetch(limit) : builder.top(limit)),
+export class MssqlPaginationDialect extends BasePaginationDialect {
+  meta = {
+    supportsNullSortDirective: false,
+    defaultNullsSortAsc: 'first' as const,
+  }
 
-  applyOffset: (builder, offset) => builder.offset(offset),
-
-  applySort: <DB, TB extends keyof DB, O>(builder: SelectQueryBuilder<DB, TB, O>, sorts: SortSet<DB, TB, O>) => {
-    for (const s of sorts) {
-      const dir = s.dir ?? 'asc'
-
-      builder = builder.orderBy(s.col as OrderByExpression<DB, TB, O>, dir)
-    }
-
-    return builder
-  },
-
-  applyCursor: baseApplyCursor,
+  override applyLimit<DB, TB extends keyof DB, O>(builder: SelectQueryBuilder<DB, TB, O>, limit: number, cursorType?: 'next' | 'prev' | 'offset'): SelectQueryBuilder<DB, TB, O> {
+    return cursorType === 'offset' ? builder.fetch(limit) : builder.top(limit)
+  }
 }

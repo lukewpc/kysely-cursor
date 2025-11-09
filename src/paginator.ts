@@ -14,7 +14,7 @@ export const createPaginator = (opts: PaginatorOptions): Paginator => ({
   paginateWithEdges: (args) => paginateWithEdges({ ...args, ...opts }),
 })
 
-export const paginate = async <DB, TB extends keyof DB, O, S extends SortSet<DB, TB, O>>({
+export const paginate = async <DB, TB extends keyof DB,O, S extends SortSet<DB, TB, O>>({
   query,
   sorts,
   limit,
@@ -70,7 +70,7 @@ export const paginate = async <DB, TB extends keyof DB, O, S extends SortSet<DB,
   }
 }
 
-export const paginateWithEdges = async <DB, TB extends keyof DB, O, S extends SortSet<DB, TB, O>>(
+export const paginateWithEdges = async <DB, TB extends keyof DB,O, S extends SortSet<DB, TB, O>>(
   args: PaginateArgs<DB, TB, O, S> & PaginatorOptions,
 ): Promise<PaginatedResultWithEdges<O>> => {
   const { sorts, cursorCodec = DEFAULT_CURSOR_CODEC } = args

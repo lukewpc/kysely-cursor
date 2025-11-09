@@ -14,7 +14,7 @@ describe('MSSQL pagination helper', () => {
   let db: Kysely<TestDB>
 
   const config: DatabaseConfig = {
-    dialect: MssqlPaginationDialect,
+    dialect: new MssqlPaginationDialect(),
     createTable: async (db) => {
       await sql`
         CREATE TABLE users (

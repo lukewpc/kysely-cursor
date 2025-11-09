@@ -13,8 +13,11 @@ type OptionallyQualified<TB, O, Allowed> = TB extends string
 
 export const applyDefaultDirection = (dir: OrderByDirection | undefined | null): OrderByDirection => dir ?? 'asc'
 
-export type SortItem<DB, TB extends keyof DB, O, Allowed> = {
+export type NullsDirection = 'first' | 'last'
+
+export type SortItem<DB, TB extends keyof DB,O, Allowed> = {
   dir?: OrderByDirection
+  nulls?: NullsDirection
 } & (
   | {
       col: ReferenceExpression<DB, TB>
@@ -27,7 +30,7 @@ export type SortItem<DB, TB extends keyof DB, O, Allowed> = {
 
 type Sortable = string | number | boolean | Date | bigint
 
-export type SortSet<DB, TB extends keyof DB, O> = readonly [
+export type SortSet<DB, TB extends keyof DB,O> = readonly [
   ...SortItem<DB, TB, O, Sortable | null>[], // nullable leading sorts
   SortItem<DB, TB, O, Sortable>, // non-null final sort
 ]

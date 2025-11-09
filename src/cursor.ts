@@ -1,11 +1,12 @@
 import { createHash } from 'crypto'
-import type { ExpressionBuilder, ExpressionWrapper, ReferenceExpression, SelectQueryBuilder, SqlBool } from 'kysely'
+import type { ExpressionBuilder, ExpressionWrapper, ReferenceExpression, SqlBool } from 'kysely'
 import { z } from 'zod'
 
 import type { Codec } from './codec/codec.js'
 import { PaginationError } from './error.js'
-import type { SortItem, SortSet } from './sorting.js'
+import type { NullsDirection, SortItem, SortSet } from './sorting.js'
 import { applyDefaultDirection } from './sorting.js'
+import { DialectMeta } from '~/types.js'
 
 const CursorPayloadSchema = z.object({
   sig: z.string(),
@@ -45,9 +46,9 @@ export const decodeCursor = async (cursor: CursorIncoming, keysetCodec: Codec<an
       type: 'prev',
       payload: await decodeCursorPayload(cursor.prevPage, keysetCodec),
     }
-  if ('offset' in cursor) return { type: 'offset', offset: cursor.offset }
+  if ('offset' in cursor) return {type: 'offset', offset: cursor.offset}
 
-  throw new PaginationError({ message: 'Invalid cursor', code: 'INVALID_TOKEN' })
+  throw new PaginationError({message: 'Invalid cursor', code: 'INVALID_TOKEN'})
 }
 
 const decodeCursorPayload = async (token: string, keysetCodec: Codec<any, string>) => {
@@ -98,7 +99,7 @@ export const resolveEdges = async <O>(
   return await Promise.all(
     rows.map(async (row) => {
       const cursor = await cursorCodec.encode(resolveCursor(row, sorts))
-      return { node: row, cursor }
+      return {node: row, cursor}
     }),
   )
 }
@@ -107,7 +108,7 @@ export const getSortOutput = (sort: SortItem<any, any, any, any>) =>
   'output' in sort ? sort.output : sort.col.split('.').at(-1)!
 
 export const sortSignature = (sorts: SortSet<any, any, any>) => {
-  const sig = sorts.map((s) => `${'output' in s ? s.output : s.col}:${s.dir ?? 'asc'}`).join('|')
+  const sig = sorts.map((s) => `${'output' in s ? s.output : s.col}:${s.dir ?? 'asc'}:${s.nulls}`).join('|')
   return createHash('sha256').update(sig).digest('hex').slice(0, 8)
 }
 
@@ -121,17 +122,22 @@ export const resolveCursor = (item: any, sorts: SortSet<any, any, any>) => {
     }),
   )
 
-  return { sig, k }
+  return {sig, k}
+}
+
+const invertNulls = (nulls: NullsDirection) => {
+  return nulls === 'first' ? 'last' : 'first'
 }
 
 export const buildCursorPredicateRecursive = <DB, TB extends keyof DB, S extends SortSet<any, any, any>>(
   eb: ExpressionBuilder<DB, TB>,
   sorts: S,
   decoded: CursorPayload,
+  meta: DialectMeta,
   idx = 0,
 ): ExpressionWrapper<DB, TB, SqlBool> => {
   const sort = sorts[idx]
-  if (!sort) throw new PaginationError({ message: 'Sort index out of bounds', code: 'UNEXPECTED_ERROR' })
+  if (!sort) throw new PaginationError({message: 'Sort index out of bounds', code: 'UNEXPECTED_ERROR'})
 
   const dir = applyDefaultDirection(sort.dir)
   const col = sort.col as ReferenceExpression<DB, TB>
@@ -142,33 +148,78 @@ export const buildCursorPredicateRecursive = <DB, TB extends keyof DB, S extends
       code: 'INVALID_TOKEN',
     })
 
+  // Determine the effective NULLS placement for this column given the direction.
+  // If caller didn't specify, take dialect defaults (ASC default provided by meta, DESC gets the inverted one).
+  const defaultAscNulls = meta.defaultNullsSortAsc // 'first' | 'last'
+  const nulls: NullsDirection =
+    sort.nulls ?? (dir === 'asc' ? defaultAscNulls : invertNulls(defaultAscNulls))
+
   const value = decoded.k[key]
+  const isLast = idx === sorts.length - 1
   const cmp = dir === 'desc' ? '<' : '>'
 
-  if (idx === sorts.length - 1) {
-    // last sort: tie-breaker
-    return eb(col, cmp, value)
+  // If there are more sort keys, build the recursive predicate for ties.
+  const next = !isLast
+    ? buildCursorPredicateRecursive(eb, sorts, decoded, meta, idx + 1)
+    : undefined
+
+  // Helper to express an always-false condition in SQL without relying on literals.
+  // (col IS NULL AND col IS NOT NULL) is guaranteed false and keeps us inside the builder API.
+  const alwaysFalse = eb.and([eb(col, 'is', null), eb(col, 'is not', null)])
+
+  // ──────────────────────────────────────────────────────────────────────────────
+  // Cases where the cursor's current value is NULL
+  // ──────────────────────────────────────────────────────────────────────────────
+  if (value === null) {
+    if (nulls === 'first') {
+      // Order: NULLs block first, then non-NULLs.
+      // After a NULL cursor:
+      //   • Remaining NULLs that come after the cursor within the NULLs block (tie goes to `next`)
+      //   • All non-NULLs (they come after the NULL block)
+      if (isLast) {
+        // No `next` to break ties among NULLs. The only way to be "after" is to leave the NULL block.
+        return eb(col, 'is not', null)
+      }
+      return eb.or([eb.and([eb(col, 'is', null), next!]), eb(col, 'is not', null)])
+    } else {
+      // nulls === 'last'
+      // Order: non-NULLs first, then NULLs block.
+      // After a NULL cursor inside the trailing NULL block:
+      //   • Only remaining NULLs after this row (tie → `next`). There are no non-NULLs after.
+      if (isLast) {
+        // With no tie-breaker, there is nothing strictly after this NULL within the NULL block.
+        return alwaysFalse
+      }
+      return eb.and([eb(col, 'is', null), next!])
+    }
   }
 
-  // recursively build predicate for the next sort field
-  const next = buildCursorPredicateRecursive(eb, sorts, decoded, idx + 1)
+  // ──────────────────────────────────────────────────────────────────────────────
+  // Cursor value is NON-NULL
+  // ──────────────────────────────────────────────────────────────────────────────
 
-  if (value === null)
-    // handle NULLs explicitly since SQL ordering treats them specially
-    return dir === 'asc'
-      ? eb.or([eb(col, 'is', null).and(next), eb(col, 'is not', null)])
-      : eb.and([eb(col, 'is', null), next])
+  // Base comparisons apply only to non-NULL candidates.
+  // (We add NULL candidates depending on null placement.)
+  const nonNullGreater = eb.and([eb(col, 'is not', null), eb(col, cmp, value)])
+  const nonNullTieThenNext = !isLast
+    ? eb.and([eb(col, 'is not', null), eb(col, '=', value), next!])
+    : undefined
 
-  // combine current column comparison with recursion for tie-breaking
+  if (isLast) {
+    // Last sort key: no recursion available.
+    // After a non-NULL value:
+    //   • non-NULL rows strictly greater (per dir)
+    //   • plus NULLs if and only if NULLs are placed after non-NULLs at this position
+    return eb.or([
+      nonNullGreater,
+      ...(nulls === 'last' ? [eb(col, 'is', null)] : []),
+    ])
+  }
+
+  // Not last: include the tie → next, and include NULLs when they are placed after non-NULLs.
   return eb.or([
-    eb(col, cmp, value), // current column moves cursor forward
-    eb.and([eb(col, '=', value), next]), // tie on current col → check next one
-    ...(dir === 'desc' ? [eb(col, 'is', null)] : []), // include NULLs in DESC order
+    nonNullGreater, // advance on current column
+    nonNullTieThenNext!, // tie → look at the next column
+    ...(nulls === 'last' ? [eb(col, 'is', null)] : []), // when NULLs are after, they are also "after" the cursor
   ])
 }
-
-export const baseApplyCursor = <DB, TB extends keyof DB, O>(
-  builder: SelectQueryBuilder<DB, TB, O>,
-  sorts: SortSet<DB, TB, O>,
-  cursor: DecodedCursorNextPrev,
-) => builder.where((eb) => buildCursorPredicateRecursive(eb, sorts, cursor.payload))

@@ -14,7 +14,7 @@ describe('PostgreSQL pagination helper', () => {
   let db: Kysely<TestDB>
 
   const config: DatabaseConfig = {
-    dialect: PostgresPaginationDialect,
+    dialect: new PostgresPaginationDialect(),
     createTable: async (db) => {
       await db.schema
         .createTable('users')

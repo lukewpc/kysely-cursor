@@ -22,7 +22,7 @@ type DB = {
   users: UserRow
 }
 
-function makeBuilder<DB, TB extends keyof DB, O>(rows: O[]): SelectQueryBuilder<DB, TB, O> {
+function makeBuilder<DB, TB extends keyof DB,O>(rows: O[]): SelectQueryBuilder<DB, TB, O> {
   const self = {
     // postgres
     limit(_: number) {
