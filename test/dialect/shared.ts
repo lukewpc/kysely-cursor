@@ -28,21 +28,21 @@ export const createTestData = () => {
   const mkDate = (days: number) => new Date(base.getTime() + days * 24 * 60 * 60 * 1000)
 
   const rows: Omit<TestRow, 'id'>[] = [
-    {name: 'Ava', created_at: mkDate(0), rating: null, active: true},
-    {name: 'Ben', created_at: mkDate(0), rating: 5, active: false},
-    {name: 'Chloé', created_at: mkDate(1), rating: 3, active: true},
-    {name: 'Drew', created_at: mkDate(2), rating: null, active: true},
-    {name: 'Eli', created_at: mkDate(2), rating: 1, active: false},
-    {name: 'Finn', created_at: mkDate(3), rating: 10, active: true},
-    {name: 'Gus', created_at: mkDate(3), rating: null, active: true},
-    {name: 'Hana', created_at: mkDate(4), rating: 4, active: false},
-    {name: 'Ivy', created_at: mkDate(4), rating: 7, active: true},
-    {name: 'Jude', created_at: mkDate(5), rating: null, active: false},
-    {name: 'Kai', created_at: mkDate(6), rating: 2, active: true},
-    {name: 'Luz', created_at: mkDate(6), rating: 8, active: true},
-    {name: 'Mia', created_at: mkDate(7), rating: null, active: true},
-    {name: 'Noah', created_at: mkDate(8), rating: 9, active: true},
-    {name: 'Oli', created_at: mkDate(9), rating: 6, active: false},
+    { name: 'Ava', created_at: mkDate(0), rating: null, active: true },
+    { name: 'Ben', created_at: mkDate(0), rating: 5, active: false },
+    { name: 'Chloé', created_at: mkDate(1), rating: 3, active: true },
+    { name: 'Drew', created_at: mkDate(2), rating: null, active: true },
+    { name: 'Eli', created_at: mkDate(2), rating: 1, active: false },
+    { name: 'Finn', created_at: mkDate(3), rating: 10, active: true },
+    { name: 'Gus', created_at: mkDate(3), rating: null, active: true },
+    { name: 'Hana', created_at: mkDate(4), rating: 4, active: false },
+    { name: 'Ivy', created_at: mkDate(4), rating: 7, active: true },
+    { name: 'Jude', created_at: mkDate(5), rating: null, active: false },
+    { name: 'Kai', created_at: mkDate(6), rating: 2, active: true },
+    { name: 'Luz', created_at: mkDate(6), rating: 8, active: true },
+    { name: 'Mia', created_at: mkDate(7), rating: null, active: true },
+    { name: 'Noah', created_at: mkDate(8), rating: 9, active: true },
+    { name: 'Oli', created_at: mkDate(9), rating: 6, active: false },
   ]
 
   return rows
@@ -59,20 +59,13 @@ const stripTable = (col: string) => col.replace(/^users\./, '')
 const effectiveNulls = (
   meta: DialectMeta,
   dir: 'asc' | 'desc',
-  explicit: NullsDirection | undefined
+  explicit: NullsDirection | undefined,
 ): NullsDirection => {
   if (explicit) return explicit
-  return dir === 'asc'
-    ? meta.defaultNullsSortAsc
-    : invertNulls(meta.defaultNullsSortAsc)
+  return dir === 'asc' ? meta.defaultNullsSortAsc : invertNulls(meta.defaultNullsSortAsc)
 }
 
-const compareRows = (
-  a: TestRow,
-  b: TestRow,
-  sorts: SortSet<TestDB, 'users', TestRow>,
-  meta: DialectMeta
-): number => {
+const compareRows = (a: TestRow, b: TestRow, sorts: SortSet<TestDB, 'users', TestRow>, meta: DialectMeta): number => {
   for (const s of sorts) {
     const col = stripTable(s.col as string)
     const dir = (s.dir ?? 'asc') as 'asc' | 'desc'
@@ -125,11 +118,11 @@ export const createTestHelpers = (db: Kysely<TestDB>, config: DatabaseConfig) =>
       query: baseBuilder(),
       sorts,
       limit,
-      cursor: token ? {nextPage: token} : undefined,
+      cursor: token ? { nextPage: token } : undefined,
     })
   }
 
-  return {baseBuilder, fetchAllPlainSorted, paginator, page}
+  return { baseBuilder, fetchAllPlainSorted, paginator, page }
 }
 
 export const resolveNextPageToken = async (items: TestRow[], sorts: SortSet<TestDB, 'users', TestRow>) => {
@@ -144,13 +137,17 @@ const nullsForDir = (defaultNullsSortAsc: NullsDirection, dir: OrderByDirection)
   return dir === 'desc' ? invertNulls(defaultNullsSortAsc) : defaultNullsSortAsc
 }
 
-export const runSharedTests = (createHelpers: () => ReturnType<typeof createTestHelpers>, dialectName: string, meta: DialectMeta) => {
+export const runSharedTests = (
+  createHelpers: () => ReturnType<typeof createTestHelpers>,
+  dialectName: string,
+  meta: DialectMeta,
+) => {
   it('paginates deterministically by created_at ASC, id ASC (with continuity across pages)', async () => {
-    const {fetchAllPlainSorted, page} = createHelpers()
+    const { fetchAllPlainSorted, page } = createHelpers()
 
     const sorts: SortSet<TestDB, 'users', TestRow> = [
-      {col: 'users.created_at', dir: 'asc'},
-      {col: 'users.id', dir: 'asc'},
+      { col: 'users.created_at', dir: 'asc' },
+      { col: 'users.id', dir: 'asc' },
     ]
 
     const expected = await fetchAllPlainSorted(sorts)
@@ -181,10 +178,10 @@ export const runSharedTests = (createHelpers: () => ReturnType<typeof createTest
   })
 
   it('returns a nextPage token when more rows exist, and omits it on the last page', async () => {
-    const {page} = createHelpers()
+    const { page } = createHelpers()
     const sorts: SortSet<TestDB, 'users', TestRow> = [
-      {col: 'users.created_at', dir: 'asc'},
-      {col: 'users.id', dir: 'asc'},
+      { col: 'users.created_at', dir: 'asc' },
+      { col: 'users.id', dir: 'asc' },
     ]
     const first = await page(4, sorts)
     expect(first.items).toHaveLength(4)
@@ -204,10 +201,10 @@ export const runSharedTests = (createHelpers: () => ReturnType<typeof createTest
   })
 
   it(`respects ${dialectName} NULLS behavior and paginates with NULLs`, async () => {
-    const {fetchAllPlainSorted, page} = createHelpers()
+    const { fetchAllPlainSorted, page } = createHelpers()
     const sorts: SortSet<TestDB, 'users', TestRow> = [
-      {col: 'users.rating', dir: 'asc'},
-      {col: 'users.id', dir: 'asc'},
+      { col: 'users.rating', dir: 'asc' },
+      { col: 'users.id', dir: 'asc' },
     ]
 
     const expected = await fetchAllPlainSorted(sorts)
@@ -236,10 +233,10 @@ export const runSharedTests = (createHelpers: () => ReturnType<typeof createTest
   })
 
   it(`supports DESC ordering with dialect NULLS behavior (${dialectName}) and paginates properly`, async () => {
-    const {fetchAllPlainSorted, page} = createHelpers()
+    const { fetchAllPlainSorted, page } = createHelpers()
     const sorts: SortSet<TestDB, 'users', TestRow> = [
-      {col: 'users.rating', dir: 'desc'},
-      {col: 'users.id', dir: 'asc'},
+      { col: 'users.rating', dir: 'desc' },
+      { col: 'users.id', dir: 'asc' },
     ]
     const expected = await fetchAllPlainSorted(sorts)
 
@@ -267,10 +264,10 @@ export const runSharedTests = (createHelpers: () => ReturnType<typeof createTest
 
   // NEW: make sure explicit nulls directive is either honored or rejected per dialect
   it('handles explicit NULLS directive according to dialect support', async () => {
-    const {page, fetchAllPlainSorted} = createHelpers()
+    const { page, fetchAllPlainSorted } = createHelpers()
     const sorts: SortSet<TestDB, 'users', TestRow> = [
-      {col: 'users.rating', dir: 'asc', nulls: 'last'}, // force opposite of most defaults
-      {col: 'users.id', dir: 'asc'},
+      { col: 'users.rating', dir: 'asc', nulls: 'last' }, // force opposite of most defaults
+      { col: 'users.id', dir: 'asc' },
     ]
 
     if (meta.supportsNullSortDirective) {
@@ -295,23 +292,23 @@ export const runSharedTests = (createHelpers: () => ReturnType<typeof createTest
   })
 
   it('throws on malformed page tokens', async () => {
-    const {page} = createHelpers()
+    const { page } = createHelpers()
     const sorts: SortSet<TestDB, 'users', TestRow> = [
-      {col: 'users.created_at', dir: 'asc'},
-      {col: 'users.id', dir: 'asc'},
+      { col: 'users.created_at', dir: 'asc' },
+      { col: 'users.id', dir: 'asc' },
     ]
     await expect(page(5, sorts, 'this-is-not-a-valid-token')).rejects.toThrowError(/Failed to paginate/i)
   })
 
   it('throws when page token does not match the provided sort signature', async () => {
-    const {page} = createHelpers()
+    const { page } = createHelpers()
     const sortsA: SortSet<TestDB, 'users', TestRow> = [
-      {col: 'users.created_at', dir: 'asc'},
-      {col: 'users.id', dir: 'asc'},
+      { col: 'users.created_at', dir: 'asc' },
+      { col: 'users.id', dir: 'asc' },
     ]
     const sortsB: SortSet<TestDB, 'users', TestRow> = [
-      {col: 'users.created_at', dir: 'desc'},
-      {col: 'users.id', dir: 'asc'},
+      { col: 'users.created_at', dir: 'desc' },
+      { col: 'users.id', dir: 'asc' },
     ]
 
     const first = await page(3, sortsA)
@@ -321,10 +318,10 @@ export const runSharedTests = (createHelpers: () => ReturnType<typeof createTest
   })
 
   it('throws when page token is missing required cursor key(s)', async () => {
-    const {fetchAllPlainSorted, page} = createHelpers()
+    const { fetchAllPlainSorted, page } = createHelpers()
     const sorts: SortSet<TestDB, 'users', TestRow> = [
-      {col: 'users.created_at', dir: 'asc'},
-      {col: 'users.id', dir: 'asc'},
+      { col: 'users.created_at', dir: 'asc' },
+      { col: 'users.id', dir: 'asc' },
     ]
 
     const expected = await fetchAllPlainSorted(sorts)
@@ -340,10 +337,10 @@ export const runSharedTests = (createHelpers: () => ReturnType<typeof createTest
   })
 
   it('can paginate with a boolean sort and a secondary tie-breaker', async () => {
-    const {fetchAllPlainSorted, page} = createHelpers()
+    const { fetchAllPlainSorted, page } = createHelpers()
     const sorts: SortSet<TestDB, 'users', TestRow> = [
-      {col: 'users.active', dir: 'desc'},
-      {col: 'users.id', dir: 'asc'},
+      { col: 'users.active', dir: 'desc' },
+      { col: 'users.id', dir: 'asc' },
     ]
     const expected = await fetchAllPlainSorted(sorts)
 
@@ -361,10 +358,10 @@ export const runSharedTests = (createHelpers: () => ReturnType<typeof createTest
 
   // make this dialect-aware, not "DESC with trailing NULLs"
   it('paginates DESC across page boundaries without rewinds/dupes around NULLs', async () => {
-    const {fetchAllPlainSorted, page} = createHelpers()
+    const { fetchAllPlainSorted, page } = createHelpers()
     const sorts: SortSet<TestDB, 'users', TestRow> = [
-      {col: 'users.rating', dir: 'desc'},
-      {col: 'users.id', dir: 'asc'},
+      { col: 'users.rating', dir: 'desc' },
+      { col: 'users.id', dir: 'asc' },
     ]
     const expected = await fetchAllPlainSorted(sorts)
 
@@ -382,10 +379,10 @@ export const runSharedTests = (createHelpers: () => ReturnType<typeof createTest
   })
 
   it('paginates ASC across page boundaries (incl. possible leading NULLs) with no gaps', async () => {
-    const {fetchAllPlainSorted, page} = createHelpers()
+    const { fetchAllPlainSorted, page } = createHelpers()
     const sorts: SortSet<TestDB, 'users', TestRow> = [
-      {col: 'rating', dir: 'asc'},
-      {col: 'id', dir: 'asc'},
+      { col: 'rating', dir: 'asc' },
+      { col: 'id', dir: 'asc' },
     ]
     const expected = await fetchAllPlainSorted(sorts)
 
@@ -402,11 +399,11 @@ export const runSharedTests = (createHelpers: () => ReturnType<typeof createTest
   })
 
   it('paginates DESC when a nullable key is not first without gaps', async () => {
-    const {fetchAllPlainSorted, page} = createHelpers()
+    const { fetchAllPlainSorted, page } = createHelpers()
     const sorts: SortSet<TestDB, 'users', TestRow> = [
-      {col: 'users.created_at', dir: 'asc'}, // non-null
-      {col: 'users.rating', dir: 'desc'}, // NULLS LAST, nullable and NOT first
-      {col: 'users.id', dir: 'asc'}, // tie-breaker
+      { col: 'users.created_at', dir: 'asc' }, // non-null
+      { col: 'users.rating', dir: 'desc' }, // NULLS LAST, nullable and NOT first
+      { col: 'users.id', dir: 'asc' }, // tie-breaker
     ]
     const expected = await fetchAllPlainSorted(sorts)
     const seen: TestRow[] = []
@@ -420,10 +417,10 @@ export const runSharedTests = (createHelpers: () => ReturnType<typeof createTest
   })
 
   it('orders boolean DESC with a clean true-prefix before falses', async () => {
-    const {page} = createHelpers()
+    const { page } = createHelpers()
     const sorts: SortSet<TestDB, 'users', TestRow> = [
-      {col: 'users.active', dir: 'desc'},
-      {col: 'users.id', dir: 'asc'},
+      { col: 'users.active', dir: 'desc' },
+      { col: 'users.id', dir: 'asc' },
     ]
     const first = await page(100, sorts)
     const firstFalseIdx = first.items.findIndex((r) => r.active === false)
@@ -435,17 +432,17 @@ export const runSharedTests = (createHelpers: () => ReturnType<typeof createTest
   })
 
   it('validates limit and sorts (throws on invalid limit)', async () => {
-    const {page} = createHelpers()
-    const sorts: SortSet<TestDB, 'users', TestRow> = [{col: 'users.id', dir: 'asc'}]
+    const { page } = createHelpers()
+    const sorts: SortSet<TestDB, 'users', TestRow> = [{ col: 'users.id', dir: 'asc' }]
     // Invalid: limit <= 0
     await expect(page(0, sorts)).rejects.toThrowError(/Invalid page size limit/i)
   })
 
   it('supports prevPage navigation (backward) and preserves item order', async () => {
-    const {baseBuilder, paginator, page} = createHelpers()
+    const { baseBuilder, paginator, page } = createHelpers()
     const sorts: SortSet<TestDB, 'users', TestRow> = [
-      {col: 'users.created_at', dir: 'asc'},
-      {col: 'users.id', dir: 'asc'},
+      { col: 'users.created_at', dir: 'asc' },
+      { col: 'users.id', dir: 'asc' },
     ]
 
     const limit = 5
@@ -459,7 +456,7 @@ export const runSharedTests = (createHelpers: () => ReturnType<typeof createTest
       query: baseBuilder(),
       sorts,
       limit,
-      cursor: {prevPage: second.prevPage!},
+      cursor: { prevPage: second.prevPage! },
     })
 
     // Should equal the first page items, in the same order
@@ -471,16 +468,16 @@ export const runSharedTests = (createHelpers: () => ReturnType<typeof createTest
       query: baseBuilder(),
       sorts,
       limit,
-      cursor: {nextPage: back.nextPage!},
+      cursor: { nextPage: back.nextPage! },
     })
     expect(forwardAgain.items.map((r) => r.id)).toEqual(second.items.map((r) => r.id))
   })
 
   it('supports offset/limit pagination across multiple pages', async () => {
-    const {baseBuilder, fetchAllPlainSorted, paginator} = createHelpers()
+    const { baseBuilder, fetchAllPlainSorted, paginator } = createHelpers()
     const sorts: SortSet<TestDB, 'users', TestRow> = [
-      {col: 'users.created_at', dir: 'asc'},
-      {col: 'users.id', dir: 'asc'},
+      { col: 'users.created_at', dir: 'asc' },
+      { col: 'users.id', dir: 'asc' },
     ]
 
     const expected = await fetchAllPlainSorted(sorts)
@@ -491,7 +488,7 @@ export const runSharedTests = (createHelpers: () => ReturnType<typeof createTest
         query: baseBuilder(),
         sorts,
         limit,
-        cursor: {offset},
+        cursor: { offset },
       })
 
       const expectedSlice = expected.slice(offset, offset + limit)
@@ -520,10 +517,10 @@ export const runSharedTests = (createHelpers: () => ReturnType<typeof createTest
   })
 
   it('emits correct startCursor/endCursor for forward paging', async () => {
-    const {page} = createHelpers()
+    const { page } = createHelpers()
     const sorts: SortSet<TestDB, 'users', TestRow> = [
-      {col: 'users.created_at', dir: 'asc'},
-      {col: 'users.id', dir: 'asc'},
+      { col: 'users.created_at', dir: 'asc' },
+      { col: 'users.id', dir: 'asc' },
     ]
 
     const first = await page(5, sorts)
@@ -542,10 +539,10 @@ export const runSharedTests = (createHelpers: () => ReturnType<typeof createTest
   })
 
   it('emits correct start/end cursors when navigating with prevPage', async () => {
-    const {baseBuilder, paginator, page} = createHelpers()
+    const { baseBuilder, paginator, page } = createHelpers()
     const sorts: SortSet<TestDB, 'users', TestRow> = [
-      {col: 'users.created_at', dir: 'asc'},
-      {col: 'users.id', dir: 'asc'},
+      { col: 'users.created_at', dir: 'asc' },
+      { col: 'users.id', dir: 'asc' },
     ]
 
     const limit = 5
@@ -556,7 +553,7 @@ export const runSharedTests = (createHelpers: () => ReturnType<typeof createTest
       query: baseBuilder(),
       sorts,
       limit,
-      cursor: {prevPage: second.prevPage!},
+      cursor: { prevPage: second.prevPage! },
     })
 
     const codec = codecPipe(superJsonCodec, base64UrlCodec)
@@ -567,10 +564,10 @@ export const runSharedTests = (createHelpers: () => ReturnType<typeof createTest
   })
 
   it('emits correct start/end cursors for offset pages and none for empty pages', async () => {
-    const {baseBuilder, paginator} = createHelpers()
+    const { baseBuilder, paginator } = createHelpers()
     const sorts: SortSet<TestDB, 'users', TestRow> = [
-      {col: 'users.created_at', dir: 'asc'},
-      {col: 'users.id', dir: 'asc'},
+      { col: 'users.created_at', dir: 'asc' },
+      { col: 'users.id', dir: 'asc' },
     ]
 
     const limit = 5
@@ -580,7 +577,7 @@ export const runSharedTests = (createHelpers: () => ReturnType<typeof createTest
       query: baseBuilder(),
       sorts,
       limit,
-      cursor: {offset: 5},
+      cursor: { offset: 5 },
     })
     const codec = codecPipe(superJsonCodec, base64UrlCodec)
     const expectedMidStart = await codec.encode(resolveCursor(mid.items[0]!, sorts))
@@ -593,7 +590,7 @@ export const runSharedTests = (createHelpers: () => ReturnType<typeof createTest
       query: baseBuilder(),
       sorts,
       limit,
-      cursor: {offset: 999},
+      cursor: { offset: 999 },
     })
     expect(empty.items).toHaveLength(0)
     expect(empty.startCursor).toBeUndefined()
@@ -601,10 +598,10 @@ export const runSharedTests = (createHelpers: () => ReturnType<typeof createTest
   })
 
   it('starts mid-way with offset, then continues using cursor tokens', async () => {
-    const {baseBuilder, fetchAllPlainSorted, paginator} = createHelpers()
+    const { baseBuilder, fetchAllPlainSorted, paginator } = createHelpers()
     const sorts: SortSet<TestDB, 'users', TestRow> = [
-      {col: 'users.created_at', dir: 'asc'},
-      {col: 'users.id', dir: 'asc'},
+      { col: 'users.created_at', dir: 'asc' },
+      { col: 'users.id', dir: 'asc' },
     ]
 
     const expected = await fetchAllPlainSorted(sorts)
@@ -615,7 +612,7 @@ export const runSharedTests = (createHelpers: () => ReturnType<typeof createTest
       query: baseBuilder(),
       sorts,
       limit,
-      cursor: {offset: 5},
+      cursor: { offset: 5 },
     })
 
     expect(mid.items.map((r) => r.id)).toEqual(expected.slice(5, 10).map((r) => r.id))
@@ -631,7 +628,7 @@ export const runSharedTests = (createHelpers: () => ReturnType<typeof createTest
         query: baseBuilder(),
         sorts,
         limit,
-        cursor: {nextPage: next},
+        cursor: { nextPage: next },
       })
       seenForward.push(...res.items)
       next = res.nextPage
@@ -644,7 +641,7 @@ export const runSharedTests = (createHelpers: () => ReturnType<typeof createTest
       query: baseBuilder(),
       sorts,
       limit,
-      cursor: {prevPage: mid.prevPage!},
+      cursor: { prevPage: mid.prevPage! },
     })
     expect(back.items.map((r) => r.id)).toEqual(expected.slice(0, 5).map((r) => r.id))
   })

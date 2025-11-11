@@ -6,6 +6,6 @@ import { BasePaginationDialect } from '~/dialect/base.js'
 export class MysqlPaginationDialect extends BasePaginationDialect {
   meta = {
     supportsNullSortDirective: false,
-    defaultNullsSortAsc: 'first' as const
+    defaultNullsSortAsc: 'first' as const,
   }
 }

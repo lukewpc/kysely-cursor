@@ -20,7 +20,7 @@ type DB = {
   users: UserRow
 }
 
-function makeBuilder<DB, TB extends keyof DB,O>(rows: O[]): SelectQueryBuilder<DB, TB, O> {
+function makeBuilder<DB, TB extends keyof DB, O>(rows: O[]): SelectQueryBuilder<DB, TB, O> {
   const self = {
     limit(_: number) {
       return self as unknown as SelectQueryBuilder<DB, TB, O>
@@ -50,6 +50,10 @@ const validSortsQualifiedOnly: SortSet<DB, 'users', UserRow> = [
   { col: 'users.created_at', dir: 'asc' },
   { col: 'users.id', dir: 'asc' },
 ]
+const validSortsNullsDirective: SortSet<DB, 'users', UserRow> = [
+  { col: 'users.created_at', dir: 'asc', nulls: 'last' },
+  { col: 'users.id', dir: 'asc' },
+]
 
 const validSortsWithBigint: SortSet<DB, 'users', UserRow> = [
   { col: 'users.orders_count', output: 'orders_count', dir: 'desc' },
@@ -70,6 +74,12 @@ const _badOutputKeyAlias: SortSet<DB, 'users', UserRow> = [
 
 // @ts-expect-error - empty sorts are disallowed
 const _emptySortsDisallowed: SortSet<DB, 'users', UserRow> = []
+
+// @ts-expect-error - no null final sort
+const validSortsNullsDirective: SortSet<DB, 'users', UserRow> = [
+  { col: 'users.created_at', dir: 'asc', nulls: 'last' },
+  { col: 'users.id', dir: 'asc', nulls: 'first' },
+]
 
 describe('paginate (type-level)', () => {
   it('returns PaginatedResult<O> with correct item type', async () => {

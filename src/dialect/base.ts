@@ -7,15 +7,24 @@ import { PaginationError } from '~/error.js'
 export abstract class BasePaginationDialect implements PaginationDialect {
   abstract meta: DialectMeta
 
-  applyLimit<DB, TB extends keyof DB, O>(builder: SelectQueryBuilder<DB, TB, O>, limit: number): SelectQueryBuilder<DB, TB, O> {
+  applyLimit<DB, TB extends keyof DB, O>(
+    builder: SelectQueryBuilder<DB, TB, O>,
+    limit: number,
+  ): SelectQueryBuilder<DB, TB, O> {
     return builder.limit(limit)
   }
 
-  applyOffset<DB, TB extends keyof DB, O>(builder: SelectQueryBuilder<DB, TB, O>, offset: number): SelectQueryBuilder<DB, TB, O> {
+  applyOffset<DB, TB extends keyof DB, O>(
+    builder: SelectQueryBuilder<DB, TB, O>,
+    offset: number,
+  ): SelectQueryBuilder<DB, TB, O> {
     return builder.offset(offset)
   }
 
-  applySort<DB, TB extends keyof DB, O>(builder: SelectQueryBuilder<DB, TB, O>, sorts: SortSet<DB, TB, O>): SelectQueryBuilder<DB, TB, O> {
+  applySort<DB, TB extends keyof DB, O>(
+    builder: SelectQueryBuilder<DB, TB, O>,
+    sorts: SortSet<DB, TB, O>,
+  ): SelectQueryBuilder<DB, TB, O> {
     for (const s of sorts) {
       const dir = s.dir ?? 'asc'
 
@@ -24,10 +33,11 @@ export abstract class BasePaginationDialect implements PaginationDialect {
 
         if (!s.nulls) return sort
 
-        if (!this.meta.supportsNullSortDirective) throw new PaginationError({
-          code: 'INVALID_SORT',
-          message: 'This dialect does not support nulls first/last',
-        })
+        if (!this.meta.supportsNullSortDirective)
+          throw new PaginationError({
+            code: 'INVALID_SORT',
+            message: 'This dialect does not support nulls first/last',
+          })
 
         switch (s.nulls) {
           case 'first':
@@ -46,7 +56,11 @@ export abstract class BasePaginationDialect implements PaginationDialect {
     return builder as SelectQueryBuilder<DB, TB, O>
   }
 
-  applyCursor<DB, TB extends keyof DB, O>(query: SelectQueryBuilder<DB, TB, O>, sorts: SortSet<DB, TB, O>, cursor: DecodedCursorNextPrev): SelectQueryBuilder<DB, TB, O> {
+  applyCursor<DB, TB extends keyof DB, O>(
+    query: SelectQueryBuilder<DB, TB, O>,
+    sorts: SortSet<DB, TB, O>,
+    cursor: DecodedCursorNextPrev,
+  ): SelectQueryBuilder<DB, TB, O> {
     return query.where((eb) => buildCursorPredicateRecursive(eb, sorts, cursor.payload, this.meta))
   }
 }

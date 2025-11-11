@@ -6,6 +6,6 @@ import { BasePaginationDialect } from '~/dialect/base.js'
 export class SqlitePaginationDialect extends BasePaginationDialect {
   meta = {
     supportsNullSortDirective: true,
-    defaultNullsSortAsc: 'first' as const
+    defaultNullsSortAsc: 'first' as const,
   }
 }

@@ -4,7 +4,7 @@ import { base64UrlCodec } from '~/codec/base64Url.js'
 import { codecPipe } from '~/codec/codec.js'
 import { superJsonCodec } from '~/codec/superJson.js'
 import * as cursorModule from '~/cursor.js'
-import { decodeCursor, resolveCursor, sortSignature } from '~/cursor.js'
+import { buildCursorPredicateRecursive, decodeCursor, resolveCursor, sortSignature } from '~/cursor.js'
 import { PaginationError } from '~/error.js'
 import { paginate, paginateWithEdges } from '~/paginator.js'
 import type { SortSet } from '~/sorting.js'
@@ -22,7 +22,7 @@ type DB = {
   users: UserRow
 }
 
-function makeBuilder<DB, TB extends keyof DB,O>(rows: O[]): SelectQueryBuilder<DB, TB, O> {
+function makeBuilder<DB, TB extends keyof DB, O>(rows: O[]): SelectQueryBuilder<DB, TB, O> {
   const self = {
     // postgres
     limit(_: number) {
@@ -285,5 +285,156 @@ describe('paginateWithEdges (runtime)', () => {
         cursorCodec,
       }),
     ).rejects.toThrow(paginationError)
+  })
+})
+
+describe('null-aware sorting', () => {
+  it('includes nulls directive in sortSignature', () => {
+    const sortsNullsFirst: SortSet<DB, 'users', UserRow> = [
+      { col: 'users.created_at', dir: 'asc', nulls: 'first' },
+      { col: 'users.id', dir: 'asc' },
+    ]
+    const sortsNullsLast: SortSet<DB, 'users', UserRow> = [
+      { col: 'users.created_at', dir: 'asc', nulls: 'last' },
+      { col: 'users.id', dir: 'asc' },
+    ]
+
+    const sigFirst = sortSignature(sortsNullsFirst)
+    const sigLast = sortSignature(sortsNullsLast)
+
+    expect(sigFirst).not.toEqual(sigLast)
+  })
+
+  it('builds predicate for a NULL cursor value when nulls come first', () => {
+    const sorts: SortSet<DB, 'users', UserRow> = [
+      { col: 'users.name', dir: 'asc', nulls: 'first' },
+      { col: 'users.id', dir: 'asc' },
+    ]
+
+    const decoded = {
+      sig: sortSignature(sorts),
+      k: {
+        name: null,
+        id: 10,
+      },
+    }
+
+    const eb: any = (col: any, op: any, value: any) => ({ type: 'cmp', col, op, value })
+    eb.and = (parts: any[]) => ({ type: 'and', parts })
+    eb.or = (parts: any[]) => ({ type: 'or', parts })
+
+    const predicate = buildCursorPredicateRecursive(eb, sorts, decoded, TestDialect.meta)
+
+    expect(predicate).toMatchObject({
+      type: 'or',
+      parts: [
+        {
+          type: 'and',
+          parts: [
+            {
+              type: 'cmp',
+              col: 'users.name',
+              op: 'is',
+              value: null,
+            },
+            {
+              type: 'or',
+              parts: [
+                {
+                  type: 'and',
+                  parts: [
+                    {
+                      type: 'cmp',
+                      col: 'users.id',
+                      op: 'is not',
+                      value: null,
+                    },
+                    {
+                      type: 'cmp',
+                      col: 'users.id',
+                      op: '>',
+                      value: 10,
+                    },
+                  ],
+                },
+                {
+                  type: 'cmp',
+                  col: 'users.id',
+                  op: 'is',
+                  value: null,
+                },
+              ],
+            },
+          ],
+        },
+        {
+          type: 'cmp',
+          col: 'users.name',
+          op: 'is not',
+          value: null,
+        },
+      ],
+    })
+  })
+
+  it('builds predicate for a NULL cursor value when nulls come last', () => {
+    const sorts: SortSet<DB, 'users', UserRow> = [
+      { col: 'users.name', dir: 'asc', nulls: 'last' },
+      { col: 'users.id', dir: 'asc' },
+    ]
+
+    const decoded = {
+      sig: sortSignature(sorts),
+      k: {
+        name: null,
+        id: 10,
+      },
+    }
+
+    const eb: any = (col: any, op: any, value: any) => ({ type: 'cmp', col, op, value })
+    eb.and = (parts: any[]) => ({ type: 'and', parts })
+    eb.or = (parts: any[]) => ({ type: 'or', parts })
+
+    const predicate = buildCursorPredicateRecursive(eb, sorts, decoded, TestDialect.meta)
+
+    expect(predicate).toMatchObject({
+      type: 'and',
+      parts: [
+        {
+          type: 'cmp',
+          col: 'users.name',
+          op: 'is',
+          value: null,
+        },
+        {
+          type: 'or',
+          parts: [
+            {
+              type: 'and',
+              parts: [
+                {
+                  type: 'cmp',
+                  col: 'users.id',
+                  op: 'is not',
+                  value: null,
+                },
+                {
+                  type: 'cmp',
+                  col: 'users.id',
+                  op: '>',
+                  value: 10,
+                },
+              ],
+            },
+            {
+              type: 'cmp',
+              col: 'users.id',
+              op: 'is',
+              value: null,
+            },
+          ],
+        },
+      ],
+    })
   })
 })

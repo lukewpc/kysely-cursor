@@ -46,9 +46,9 @@ export const decodeCursor = async (cursor: CursorIncoming, keysetCodec: Codec<an
       type: 'prev',
       payload: await decodeCursorPayload(cursor.prevPage, keysetCodec),
     }
-  if ('offset' in cursor) return {type: 'offset', offset: cursor.offset}
+  if ('offset' in cursor) return { type: 'offset', offset: cursor.offset }
 
-  throw new PaginationError({message: 'Invalid cursor', code: 'INVALID_TOKEN'})
+  throw new PaginationError({ message: 'Invalid cursor', code: 'INVALID_TOKEN' })
 }
 
 const decodeCursorPayload = async (token: string, keysetCodec: Codec<any, string>) => {
@@ -99,7 +99,7 @@ export const resolveEdges = async <O>(
   return await Promise.all(
     rows.map(async (row) => {
       const cursor = await cursorCodec.encode(resolveCursor(row, sorts))
-      return {node: row, cursor}
+      return { node: row, cursor }
     }),
   )
 }
@@ -122,7 +122,7 @@ export const resolveCursor = (item: any, sorts: SortSet<any, any, any>) => {
     }),
   )
 
-  return {sig, k}
+  return { sig, k }
 }
 
 export const invertNulls = (nulls: NullsDirection) => {
@@ -137,7 +137,7 @@ export const buildCursorPredicateRecursive = <DB, TB extends keyof DB, S extends
   idx = 0,
 ): ExpressionWrapper<DB, TB, SqlBool> => {
   const sort = sorts[idx]
-  if (!sort) throw new PaginationError({message: 'Sort index out of bounds', code: 'UNEXPECTED_ERROR'})
+  if (!sort) throw new PaginationError({ message: 'Sort index out of bounds', code: 'UNEXPECTED_ERROR' })
 
   const dir = applyDefaultDirection(sort.dir)
   const col = sort.col as ReferenceExpression<DB, TB>
@@ -151,17 +151,14 @@ export const buildCursorPredicateRecursive = <DB, TB extends keyof DB, S extends
   // Determine the effective NULLS placement for this column given the direction.
   // If caller didn't specify, take dialect defaults (ASC default provided by meta, DESC gets the inverted one).
   const defaultAscNulls = meta.defaultNullsSortAsc // 'first' | 'last'
-  const nulls: NullsDirection =
-    sort.nulls ?? (dir === 'asc' ? defaultAscNulls : invertNulls(defaultAscNulls))
+  const nulls: NullsDirection = sort.nulls ?? (dir === 'asc' ? defaultAscNulls : invertNulls(defaultAscNulls))
 
   const value = decoded.k[key]
   const isLast = idx === sorts.length - 1
   const cmp = dir === 'desc' ? '<' : '>'
 
   // If there are more sort keys, build the recursive predicate for ties.
-  const next = !isLast
-    ? buildCursorPredicateRecursive(eb, sorts, decoded, meta, idx + 1)
-    : undefined
+  const next = !isLast ? buildCursorPredicateRecursive(eb, sorts, decoded, meta, idx + 1) : undefined
 
   // Helper to express an always-false condition in SQL without relying on literals.
   // (col IS NULL AND col IS NOT NULL) is guaranteed false and keeps us inside the builder API.
@@ -201,19 +198,14 @@ export const buildCursorPredicateRecursive = <DB, TB extends keyof DB, S extends
   // Base comparisons apply only to non-NULL candidates.
   // (We add NULL candidates depending on null placement.)
   const nonNullGreater = eb.and([eb(col, 'is not', null), eb(col, cmp, value)])
-  const nonNullTieThenNext = !isLast
-    ? eb.and([eb(col, 'is not', null), eb(col, '=', value), next!])
-    : undefined
+  const nonNullTieThenNext = !isLast ? eb.and([eb(col, 'is not', null), eb(col, '=', value), next!]) : undefined
 
   if (isLast) {
     // Last sort key: no recursion available.
     // After a non-NULL value:
     //   • non-NULL rows strictly greater (per dir)
     //   • plus NULLs if and only if NULLs are placed after non-NULLs at this position
-    return eb.or([
-      nonNullGreater,
-      ...(nulls === 'last' ? [eb(col, 'is', null)] : []),
-    ])
+    return eb.or([nonNullGreater, ...(nulls === 'last' ? [eb(col, 'is', null)] : [])])
   }
 
   // Not last: include the tie → next, and include NULLs when they are placed after non-NULLs.
