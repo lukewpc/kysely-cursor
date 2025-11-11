@@ -29,14 +29,6 @@ describe('MySQL pagination helper', () => {
     insertTestData: async (db, rows) => {
       await db.insertInto('users').values(rows).execute()
     },
-    applySortToQuery: (query, sorts) => {
-      for (const s of sorts) {
-        const dir = s.dir ?? 'asc'
-        // MSSQL's default NULLS behavior: NULLS FIRST for ASC, NULLS LAST for DESC
-        query = query.orderBy(s.col as any, dir)
-      }
-      return query
-    },
   }
 
   beforeAll(async () => {

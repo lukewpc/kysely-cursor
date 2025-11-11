@@ -38,20 +38,6 @@ describe('SQLite pagination helper', () => {
         )
         .execute()
     },
-    applySortToQuery: (query, sorts) => {
-      for (const s of sorts) {
-        const dir = s.dir ?? 'asc'
-        query = query.orderBy(s.col, (o: any) => {
-          const base = dir === 'asc' ? o.asc() : o.desc()
-
-          if (s.nulls === 'first') return base.nullsFirst()
-          if (s.nulls === 'last') return base.nullsLast()
-
-          return dir === 'asc' ? base.nullsFirst() : base.nullsLast()
-        })
-      }
-      return query
-    },
   }
 
   beforeAll(async () => {

@@ -52,16 +52,61 @@ export interface DatabaseConfig {
   dialect: PaginationDialect
   createTable: (db: Kysely<TestDB>) => Promise<void>
   insertTestData: (db: Kysely<TestDB>, rows: Omit<TestRow, 'id'>[]) => Promise<void>
-  applySortToQuery: (query: any, sorts: SortSet<TestDB, 'users', TestRow>) => any
+}
+
+const stripTable = (col: string) => col.replace(/^users\./, '')
+
+const effectiveNulls = (
+  meta: DialectMeta,
+  dir: 'asc' | 'desc',
+  explicit: NullsDirection | undefined
+): NullsDirection => {
+  if (explicit) return explicit
+  return dir === 'asc'
+    ? meta.defaultNullsSortAsc
+    : invertNulls(meta.defaultNullsSortAsc)
+}
+
+const compareRows = (
+  a: TestRow,
+  b: TestRow,
+  sorts: SortSet<TestDB, 'users', TestRow>,
+  meta: DialectMeta
+): number => {
+  for (const s of sorts) {
+    const col = stripTable(s.col as string)
+    const dir = (s.dir ?? 'asc') as 'asc' | 'desc'
+    const an = (a as any)[col]
+    const bn = (b as any)[col]
+    const nulls = effectiveNulls(meta, dir, s.nulls)
+
+    // null-handling first
+    const aIsNull = an == null
+    const bIsNull = bn == null
+    if (aIsNull || bIsNull) {
+      if (aIsNull && bIsNull) {
+        // equal on this column, continue to next
+      } else if (aIsNull) {
+        return nulls === 'first' ? -1 : 1
+      } else {
+        return nulls === 'first' ? 1 : -1
+      }
+    } else {
+      // both non-null: normal compare
+      if (an < bn) return dir === 'asc' ? -1 : 1
+      if (an > bn) return dir === 'asc' ? 1 : -1
+    }
+  }
+
+  return 0
 }
 
 export const createTestHelpers = (db: Kysely<TestDB>, config: DatabaseConfig) => {
   const baseBuilder = () => db.selectFrom('users').select(['id', 'name', 'created_at', 'rating', 'active'])
 
   const fetchAllPlainSorted = async (sorts: SortSet<TestDB, 'users', TestRow>) => {
-    let q = baseBuilder()
-    q = config.applySortToQuery(q, sorts)
-    return await q.execute()
+    const rows = await baseBuilder().execute()
+    return [...rows].sort((a, b) => compareRows(a, b, sorts, config.dialect.meta))
   }
 
   const cursorCodec = codecPipe(superJsonCodec, base64UrlCodec)
