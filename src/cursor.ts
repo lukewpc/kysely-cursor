@@ -125,7 +125,7 @@ export const resolveCursor = (item: any, sorts: SortSet<any, any, any>) => {
   return {sig, k}
 }
 
-const invertNulls = (nulls: NullsDirection) => {
+export const invertNulls = (nulls: NullsDirection) => {
   return nulls === 'first' ? 'last' : 'first'
 }
 

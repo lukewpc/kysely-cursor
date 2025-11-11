@@ -31,8 +31,14 @@ describe('PostgreSQL pagination helper', () => {
     applySortToQuery: (query, sorts) => {
       for (const s of sorts) {
         const dir = s.dir ?? 'asc'
-        // Reproduce PostgresStrategy's NULLS behavior for parity with MSSQL
-        query = query.orderBy(s.col, (o: any) => (dir === 'asc' ? o.asc().nullsFirst() : o.desc().nullsLast()))
+        query = query.orderBy(s.col, (o: any) => {
+          const base = dir === 'asc' ? o.asc() : o.desc()
+
+          if (s.nulls === 'first') return base.nullsFirst()
+          if (s.nulls === 'last') return base.nullsLast()
+
+          return dir === 'asc' ? base.nullsLast() : base.nullsFirst()
+        })
       }
       return query
     },
@@ -58,5 +64,5 @@ describe('PostgreSQL pagination helper', () => {
     await pg?.stop().catch(() => {})
   })
 
-  runSharedTests(() => createTestHelpers(db, config), 'postgres')
+  runSharedTests(() => createTestHelpers(db, config), 'postgres', config.dialect.meta)
 })

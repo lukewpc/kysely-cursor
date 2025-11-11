@@ -86,5 +86,5 @@ describe('MSSQL pagination helper', () => {
     await mssql?.stop().catch(() => {})
   })
 
-  runSharedTests(() => createTestHelpers(db, config), 'mssql')
+  runSharedTests(() => createTestHelpers(db, config), 'mssql', config.dialect.meta)
 })

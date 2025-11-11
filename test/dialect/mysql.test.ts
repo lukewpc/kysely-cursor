@@ -84,5 +84,5 @@ describe('MySQL pagination helper', () => {
     await mysqlC?.stop().catch(() => {})
   })
 
-  runSharedTests(() => createTestHelpers(db, config), 'mysql')
+  runSharedTests(() => createTestHelpers(db, config), 'mysql', config.dialect.meta)
 })

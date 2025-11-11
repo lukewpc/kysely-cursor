@@ -107,7 +107,7 @@ const db = new Kysely<DB>({
 const cursorCodec = codecPipe(superJsonCodec, base64UrlCodec)
 
 const paginator = createPaginator({
-  dialect: PostgresPaginationDialect,
+  dialect: new PostgresPaginationDialect(),
   cursorCodec,
 })
 
