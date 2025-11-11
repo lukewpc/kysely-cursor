@@ -46,6 +46,10 @@ function makeBuilder<DB, TB extends keyof DB,O>(rows: O[]): SelectQueryBuilder<D
 }
 
 const TestDialect: PaginationDialect = {
+  meta: {
+    supportsNullSortDirective: true,
+    defaultNullsSortAsc: 'last',
+  },
   applyLimit: (builder, limit) => ((builder as any).limit ? (builder as any).limit(limit) : builder),
   applyOffset: (builder) => builder,
   applySort: (builder, sorts) =>

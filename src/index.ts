@@ -7,6 +7,7 @@ export { stashCodec } from './codec/stash.js'
 export { superJsonCodec } from './codec/superJson.js'
 
 // dialects
+export { BasePaginationDialect } from './dialect/base.js'
 export { MssqlPaginationDialect } from './dialect/mssql.js'
 export { MysqlPaginationDialect } from './dialect/mysql.js'
 export { PostgresPaginationDialect } from './dialect/postgres.js'

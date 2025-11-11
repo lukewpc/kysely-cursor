@@ -36,7 +36,8 @@ export abstract class BasePaginationDialect implements PaginationDialect {
             return sort.nullsLast()
           default:
             throw new PaginationError({
-              message: 'Unsupported nulls first/last', code: 'INVALID_SORT'
+              message: 'Unsupported nulls first/last',
+              code: 'INVALID_SORT',
             })
         }
       })
