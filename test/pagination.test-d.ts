@@ -50,6 +50,7 @@ const validSortsQualifiedOnly: SortSet<DB, 'users', UserRow> = [
   { col: 'users.created_at', dir: 'asc' },
   { col: 'users.id', dir: 'asc' },
 ]
+
 const validSortsNullsDirective: SortSet<DB, 'users', UserRow> = [
   { col: 'users.created_at', dir: 'asc', nulls: 'last' },
   { col: 'users.id', dir: 'asc' },
@@ -76,7 +77,7 @@ const _badOutputKeyAlias: SortSet<DB, 'users', UserRow> = [
 const _emptySortsDisallowed: SortSet<DB, 'users', UserRow> = []
 
 // @ts-expect-error - no null final sort
-const validSortsNullsDirective: SortSet<DB, 'users', UserRow> = [
+const _badNullsDirectiveFinalSort: SortSet<DB, 'users', UserRow> = [
   { col: 'users.created_at', dir: 'asc', nulls: 'last' },
   { col: 'users.id', dir: 'asc', nulls: 'first' },
 ]
@@ -144,7 +145,6 @@ describe('paginate (type-level)', () => {
 
   it('infers item type via ExtractPaginatedItem helper', async () => {
     const builder = makeBuilder<DB, 'users', UserRow>([])
-
     const paginator = createPaginator({ dialect: new PostgresPaginationDialect() })
     const _run = () =>
       paginator.paginate<DB, 'users', UserRow, typeof validSortsAscId>({
@@ -163,6 +163,16 @@ describe('paginate (type-level)', () => {
     await paginator.paginate<DB, 'users', UserRow, typeof validSortsQualifiedOnly>({
       query: builder,
       sorts: validSortsQualifiedOnly,
+      limit: 10,
+    })
+  })
+
+  it('supports nulls directive on non-final sorts', async () => {
+    const builder = makeBuilder<DB, 'users', UserRow>([])
+    const paginator = createPaginator({ dialect: new PostgresPaginationDialect() })
+    await paginator.paginate<DB, 'users', UserRow, typeof validSortsNullsDirective>({
+      query: builder,
+      sorts: validSortsNullsDirective,
       limit: 10,
     })
   })
