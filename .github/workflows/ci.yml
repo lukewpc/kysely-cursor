@@ -196,8 +196,9 @@ jobs:
             exit 0
           fi
           mkdir -p bench/results
+          # pnpm --filter runs with cwd=bench/, so use repo-absolute paths for --merge.
           pnpm --filter kysely-cursor-bench bench -- \
-            --merge bench/artifacts \
+            --merge "${{ github.workspace }}/bench/artifacts" \
             --git-sha "${{ github.sha }}" \
             --compare \
             --threshold 1.5 \
@@ -234,8 +235,9 @@ jobs:
             echo "No dialect result artifacts — skip baseline update."
             exit 0
           fi
+          # pnpm --filter runs with cwd=bench/, so use repo-absolute paths for --merge.
           pnpm --filter kysely-cursor-bench bench -- \
-            --merge bench/artifacts \
+            --merge "${{ github.workspace }}/bench/artifacts" \
             --git-sha "${{ github.sha }}" \
             --update-baseline
 
