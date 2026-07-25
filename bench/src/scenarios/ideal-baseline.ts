@@ -1,32 +1,109 @@
+import type { SelectQueryBuilder } from 'kysely'
 import { sql } from 'kysely'
 
+import type { DialectName } from '../config.js'
 import { applyPageWindow } from '../dialects/query.js'
 import { measure, samplesFor, summarize } from '../metrics.js'
-import type { ComparisonRow, Sample, ScenarioContext, ScenarioResult } from '../types.js'
+import type { BenchDB, ComparisonRow, Post, Sample, ScenarioContext, ScenarioResult } from '../types.js'
 
 /**
- * Educational baseline: pure SQL ideal keyset vs OFFSET, bypassing the library.
+ * Raw SQL keyset form that matches what the library emits for feed sorts with
+ * `nullable: false` on each dialect (see MysqlPaginationDialect /
+ * PostgresPaginationDialect meta flags). Not a generic “textbook” shape.
  *
- * Ideal keyset uses row comparison so planners can emit Index Cond seeks:
- *   WHERE (created_at, id) < ($1, $2)
- *   ORDER BY created_at DESC, id DESC LIMIT n
+ * | Dialect  | Library path (`nullable: false`) | Ideal baseline SQL        |
+ * |----------|----------------------------------|---------------------------|
+ * | postgres | row_compare                      | `(created_at, id) < (?,?)`|
+ * | sqlite   | row_compare                      | same                      |
+ * | mysql    | null_safe_or (intentional)       | IS NOT NULL guards + OR   |
+ * | mssql    | plain_or                         | classic OR, no null guards|
  *
- * Library deep-page / scoreboard sorts set `nullable: false` so they can emit
- * the same seek-friendly shape (row compare or plain OR) plus token codec cost.
- * Default (unmarked) library sorts still use null-safe OR trees
- * (`col IS NOT NULL AND col < $1 OR …`), which Postgres often plans as a Filter
- * over an index walk — comparable to OFFSET. Compare this scenario with
- * deep-page to isolate codec + library overhead on the optimized path.
+ * MySQL keeps null-safe OR even when callers mark keys non-null: benches show
+ * plain OR / row compare often regress at depth on that engine. Ideal must
+ * use the same form or “library vs ceiling” charts invert (lib faster than
+ * “ideal” row compare).
  *
- * MSSQL has no row-value constructor comparison; we fall back to the classic
- * OR form there (still without the library’s IS NOT NULL wrappers).
+ * Compare with library deep-page to isolate token codec + wrapper overhead.
  */
+export type IdealKeysetForm = 'row_compare' | 'null_safe_or' | 'plain_or'
+
+export const idealKeysetFormFor = (dialect: DialectName): IdealKeysetForm => {
+  switch (dialect) {
+    case 'mysql':
+      return 'null_safe_or'
+    case 'mssql':
+      return 'plain_or'
+    case 'postgres':
+    case 'sqlite':
+      return 'row_compare'
+  }
+}
+
+type PostsQuery = SelectQueryBuilder<BenchDB, 'posts', Post>
+
+const applyIdealKeyset = (
+  form: IdealKeysetForm,
+  q: PostsQuery,
+  boundary: { id: number; created_at: Date },
+): PostsQuery => {
+  const b = boundary
+
+  if (form === 'row_compare') {
+    return q.where(sql<boolean>`(created_at, id) < (${b.created_at}, ${b.id})`)
+  }
+
+  if (form === 'plain_or') {
+    return q.where((eb) =>
+      eb.or([
+        eb('created_at', '<', b.created_at),
+        eb.and([eb('created_at', '=', b.created_at), eb('id', '<', b.id)]),
+      ]),
+    )
+  }
+
+  // null_safe_or — matches library default / MySQL optimized path
+  return q.where((eb) =>
+    eb.or([
+      eb.and([eb('created_at', 'is not', null), eb('created_at', '<', b.created_at)]),
+      eb.and([
+        eb('created_at', 'is not', null),
+        eb('created_at', '=', b.created_at),
+        eb('id', 'is not', null),
+        eb('id', '<', b.id),
+      ]),
+    ]),
+  )
+}
+
+const describeForm = (form: IdealKeysetForm): string => {
+  switch (form) {
+    case 'row_compare':
+      return (
+        'Dialect-matched raw keyset via row comparison `(created_at, id) < ($1, $2)` vs OFFSET — ' +
+        'same shape as library deep-page with `nullable: false` on this dialect (no token codec). ' +
+        'On Postgres this is an Index Cond seek. Compare with deep-page for codec/wrapper overhead.'
+      )
+    case 'null_safe_or':
+      return (
+        'Dialect-matched raw keyset via null-safe OR (MySQL library path even with `nullable: false`) ' +
+        'vs OFFSET — no library wrappers or token codec. Row compare / plain OR are *not* used as ' +
+        'the ceiling here; MySQL often seeks this form better at depth.'
+      )
+    case 'plain_or':
+      return (
+        'Dialect-matched raw keyset via classic OR (`created_at < $1 OR (created_at = $1 AND id < $2)`) ' +
+        'vs OFFSET — same shape as library deep-page on MSSQL (no row-value compare, no null-safe ' +
+        'wrappers, no token codec).'
+      )
+  }
+}
+
 export const runIdealBaseline = async (ctx: ScenarioContext): Promise<ScenarioResult> => {
   const { handle, pageSize, deepPageDepths, iterations, warmup } = ctx
   const depths = deepPageDepths.filter((d) => d === 0 || d >= 50).slice(0, 6)
   const samples: Sample[] = []
   const labels: string[] = []
-  const useRowCompare = handle.name !== 'mssql'
+  const form = idealKeysetFormFor(handle.name)
   const dialect = handle.name
 
   for (const depth of depths) {
@@ -46,24 +123,14 @@ export const runIdealBaseline = async (ctx: ScenarioContext): Promise<ScenarioRe
     }
 
     const idealFn = async () => {
-      let q = handle.db
+      let q: PostsQuery = handle.db
         .selectFrom('posts')
         .select(['id', 'author_id', 'title', 'body', 'status', 'score', 'created_at'])
         .orderBy('created_at', 'desc')
         .orderBy('id', 'desc')
 
       if (boundary) {
-        const b = boundary
-        if (useRowCompare) {
-          q = q.where(sql<boolean>`(created_at, id) < (${b.created_at}, ${b.id})`)
-        } else {
-          q = q.where((eb) =>
-            eb.or([
-              eb('created_at', '<', b.created_at),
-              eb.and([eb('created_at', '=', b.created_at), eb('id', '<', b.id)]),
-            ]),
-          )
-        }
+        q = applyIdealKeyset(form, q, boundary)
       }
 
       const rows = await applyPageWindow(dialect, q, pageSize).execute()
@@ -115,10 +182,8 @@ export const runIdealBaseline = async (ctx: ScenarioContext): Promise<ScenarioRe
 
   return {
     scenario: 'ideal-baseline',
-    title: 'Ideal keyset baseline (raw SQL, no library)',
-    description: useRowCompare
-      ? 'Textbook keyset via row comparison `(created_at, id) < ($1, $2)` vs OFFSET — no library, no token codec. On Postgres this becomes an Index Cond seek (buffers ≪ OFFSET). Compare with library deep-page (`nullable: false`) to isolate codec/wrapper overhead on the same seek shape.'
-      : 'Classic OR keyset (`created_at < $1 OR (created_at = $1 AND id < $2)`) vs OFFSET on MSSQL (no row-value comparison). No library wrappers or token codec.',
+    title: `Ideal keyset baseline (raw SQL, ${form}, no library)`,
+    description: describeForm(form),
     samples,
     comparisons,
   }

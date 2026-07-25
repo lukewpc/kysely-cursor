@@ -73,40 +73,76 @@ pnpm --filter kysely-cursor-bench bench -- --dialect postgres,sqlite --rows 5000
 | **filtered-feed**   | `WHERE status = 'published'` product listing                     | Selective filter + composite index                                 |
 | **author-timeline** | `WHERE author_id = ?` profile feed                               | Selective secondary key + deep paging                              |
 | **scoreboard**      | `ORDER BY score DESC, id DESC` ranking                           | Non-time secondary sort + `(score, id)` index                      |
-| **ideal-baseline**  | Textbook raw keyset SQL vs OFFSET (no library)                   | Theoretical ceiling; isolates token codec overhead vs library path |
+| **ideal-baseline**  | Raw keyset SQL matching the dialect’s library emission           | Codec/wrapper ceiling — not a generic “textbook” shape on every DB |
 
-### Interpreting library vs ideal results
+### What SQL the library emits (timed scenarios)
 
-**Default** (unmarked leading sorts) still uses null-safe OR so nullable columns
-work across dialects:
+Timed scenarios set `nullable: false` on non-null sort keys. Emission still follows
+each dialect’s capability flags (same as production):
+
+| Dialect    | With `nullable: false` (feed / score sorts) | Notes |
+| ---------- | ------------------------------------------- | ----- |
+| `postgres` | **Row compare** `(created_at, id) < ($1,$2)` | Index Cond seek |
+| `sqlite`   | **Row compare**                             | Same family |
+| `mssql`    | **Plain OR** (no tuple compare)             | Cursor still wins; latency can grow with depth |
+| `mysql`    | **Null-safe OR** (even with `nullable: false`) | Intentional: plain OR / row compare often regress at depth on MySQL |
+
+Default (unmarked) leading sorts stay **null-safe OR** on every dialect. On
+Postgres that shape is typically a **Filter** over an index walk
+(`Rows Removed by Filter ≈ OFFSET`), not an Index Cond seek — so deep pages
+look ~like OFFSET unless you opt into `nullable: false`.
 
 ```sql
+-- default / MySQL optimized path
 WHERE (created_at IS NOT NULL AND created_at < $1)
    OR (created_at IS NOT NULL AND created_at = $1 AND id IS NOT NULL AND id < $2)
-```
 
-On PostgreSQL that shape is typically a **Filter** over an index walk
-(`Rows Removed by Filter ≈ OFFSET`), not an **Index Cond** seek.
-
-Timed bench scenarios set `nullable: false` on non-null columns. The library then
-emits seek-friendly SQL where the dialect allows it — on Postgres, row compare:
-
-```sql
+-- Postgres / SQLite with nullable: false
 WHERE (created_at, id) < ($1, $2)
 ```
 
-which becomes an Index Cond seek (same shape as the ideal baseline).
+### Interpreting library vs ideal
 
-Typical Postgres plans at depth 1000 (50k×~800B rows, warm cache):
+**ideal-baseline** uses raw SQL in the **same form the library uses on that dialect**,
+without the token codec or paginator wrapper:
+
+| Dialect    | Ideal keyset form                          |
+| ---------- | ------------------------------------------ |
+| `postgres` | Row compare                                |
+| `sqlite`   | Row compare                                |
+| `mysql`    | Null-safe OR (not row compare)             |
+| `mssql`    | Plain OR                                   |
+
+Library deep-page should **approach** ideal on that dialect. A large inverted gap
+(lib ≫ ideal or ideal ≫ lib) usually means plan mismatch, not “magic” library
+performance.
+
+Typical Postgres plans at depth ~1000+ (warm cache, ~800B rows):
 
 | Form                           | Plan shape                        | Buffers | Exec time (order of magnitude) |
 | ------------------------------ | --------------------------------- | ------- | ------------------------------ |
-| Library null-safe OR (default) | Index Scan + Filter, ~25k removed | ~3000   | ~same as OFFSET                |
-| Library with `nullable: false` | Index Cond seek                   | ~7      | **~100× faster**               |
-| Ideal row comparison (raw SQL) | Index Cond seek                   | ~7      | theoretical ceiling            |
-| OFFSET 25000                   | Index Scan, skip 25k              | ~3000   | baseline                       |
+| Library null-safe OR (default) | Index Scan + Filter, many removed | ~thousands | ~same as OFFSET            |
+| Library `nullable: false`      | Index Cond seek                   | ~single digits | **much faster**          |
+| Ideal row comparison (raw SQL) | Index Cond seek                   | ~same as seek  | codec ceiling            |
+| OFFSET deep skip               | Index Scan, skip N                | ~thousands | baseline                   |
 
-Postgres runs attach `EXPLAIN (ANALYZE, BUFFERS)` at the deepest measured page.
+Postgres runs attach `EXPLAIN (ANALYZE, BUFFERS)` at the deepest measured page
+(library seek form, default null-safe OR, and OFFSET).
+
+### Reading MySQL (and OFFSET cliffs)
+
+MySQL often shows a **sharp OFFSET cliff** once skip distance and fat row payloads
+add up (this bench selects a non-indexed ~800B `body` column). Cursor stays roughly
+flat while OFFSET can jump from a few ms to hundreds of ms between mid and deep
+pages. That is **engine + workload** behavior (large `OFFSET` still walks and
+discards rows), not a library bug.
+
+**Do not** treat multi-thousand× MySQL speedups as portable marketing numbers —
+they depend on row width, indexes, and depth. Prefer quoting Postgres growth
+curves + plans, and describing MySQL as “cursor flat / OFFSET collapses under
+deep skip.”
+
+### Stability vs latency
 
 **Cursor pagination still wins on stability** under concurrent inserts/deletes
 (no skipped/duplicated rows). These benches measure **latency**, not correctness.
@@ -117,7 +153,7 @@ A single realistic `posts` table is seeded deterministically on every dialect:
 
 ```
 posts (
-  id, author_id, title, status, score, created_at
+  id, author_id, title, body, status, score, created_at
 )
 ```
 
@@ -129,7 +165,8 @@ Indexes:
 - `(score, id)` — scoreboard-style sorts
 
 ~70% of rows are `status = 'published'`. Author `1` owns every 50th row so the
-timeline scenario has real depth.
+timeline scenario has real depth. `body` is non-indexed payload so deep OFFSET
+cannot stay index-only.
 
 ## Reports
 
@@ -152,6 +189,7 @@ deep-page summary, and written takeaways.
 - **Δ ms** = `offset.mean − cursor.mean` (positive ⇒ cursor faster).
 - Absolute ms depends on machine and container RTT; the **relative** gap is the signal.
 - Page 0 is often similar for both strategies (no skip). The gap opens as depth grows.
+- Compare **within a dialect**, not absolute ms across Postgres vs SQLite (containers vs in-process).
 
 ## Methodology
 

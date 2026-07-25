@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Compatibility matrix: peer range is kysely >=0.28.6.
-# Exercises every published 0.28.x / 0.29.x release in that range.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -16,7 +14,6 @@ restore() {
 trap restore EXIT
 
 versions=(
-  # 0.28.x (from supported floor)
   0.28.6
   0.28.7
   0.28.8
@@ -29,7 +26,6 @@ versions=(
   0.28.15
   0.28.16
   0.28.17
-  # 0.29.x through current
   0.29.0
   0.29.1
   0.29.2
