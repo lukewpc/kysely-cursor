@@ -55,7 +55,10 @@ describe('MySQL pagination helper', () => {
       },
     })
 
-    const dialect = new MysqlDialect({ pool })
+    // mysql2 Pool typings have drifted relative to Kysely's MysqlPool across
+    // 0.28.x (strict structural match fails on older Kysely + newer mysql2).
+    // Runtime shape is fine; cast keeps the compatibility matrix green.
+    const dialect = new MysqlDialect({ pool: pool as any })
     db = new Kysely<TestDB>({ dialect })
 
     await config.createTable(db)

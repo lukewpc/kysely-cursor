@@ -3,9 +3,9 @@ import type { OrderByExpression, SelectQueryBuilder } from 'kysely'
 import { PaginationError } from '~/error.js'
 
 import type { DecodedCursorNextPrev } from '../cursor.js'
-import { buildCursorPredicateRecursive } from '../cursor.js'
+import { emitKeysetPredicate } from '../keyset.js'
 import type { SortSet } from '../sorting.js'
-import type { DialectMeta, PaginationDialect } from '../types.js'
+import type { DialectMeta, KeysetStrategy, PaginationDialect } from '../types.js'
 
 export abstract class BasePaginationDialect implements PaginationDialect {
   abstract meta: DialectMeta
@@ -63,7 +63,8 @@ export abstract class BasePaginationDialect implements PaginationDialect {
     query: SelectQueryBuilder<DB, TB, O>,
     sorts: SortSet<DB, TB, O>,
     cursor: DecodedCursorNextPrev,
+    keysetStrategy: KeysetStrategy = 'auto',
   ): SelectQueryBuilder<DB, TB, O> {
-    return query.where((eb) => buildCursorPredicateRecursive(eb, sorts, cursor.payload, this.meta))
+    return query.where((eb) => emitKeysetPredicate(eb, sorts, cursor.payload, this.meta, keysetStrategy))
   }
 }

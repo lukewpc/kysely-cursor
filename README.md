@@ -28,7 +28,6 @@ Cursor‑based (keyset) pagination utilities for [Kysely](https://github.com/kys
     - [Codecs](#codecs)
     - [Null Sorting Behavior](#null-sorting-behavior)
       - [Current behavior](#current-behavior)
-      - [Future plans](#future-plans)
   - [API](#api)
     - [`createPaginator`](#createpaginator)
     - [`paginate` (low-level)](#paginate-low-level)
@@ -61,6 +60,7 @@ yielding:
 
 - **Next/previous** page navigation with automatic sort inversion for `prev`.
 - **Offset fallback** via `cursor: { offset: number }` when you must use numeric offsets.
+- **Optional opt-in** for faster deep-page queries when leading sort keys are non-null (`nullable: false`).
 - **Pluggable codecs** for page tokens: SuperJSON, Base64 URL, AES‑GCM encryption, and external stash storage.
 - **Composable codecs** (`codecPipe`) to build pipelines like `superjson → encrypt → base64url`.
 - **Typed** end‑to‑end with Kysely generics; sort keys map to your selected output.
@@ -149,9 +149,14 @@ const sorts = [
 - Leading sorts take precedence over later sorts.
 - Leading sorts may be nullable; the **final sort must be non-nullable & unique**.
 - Use a primary key or a unique index for the final sort — this acts as a tie-breaker.
+- Prefer a composite index that matches the sort, e.g. `(created_at DESC, id DESC)`.
 - `dir` is the sort direction. Defaults to `asc`.
 - `col` is the field to sort by, optionally qualified.
-- `output` is the field name in your outputted rows. Defaults to `col`, without the qualifying prefix. May need to be explicitly set if your `col` is aliased in your select statement.
+- `output` is the field name in your outputted rows. Defaults to `col`, without the qualifying prefix. May need to be
+  explicitly set if your `col` is aliased in your select statement.
+- `nullable` — for **leading** keys that never contain NULL, set `nullable: false` so the library can use a simpler
+  (usually faster) keyset predicate. Omit it when the column may be null; that is also the default if you leave it out.
+  TypeScript rejects `nullable: false` on columns typed as `| null`, and `nullable: true` on non-null columns.
 - `nulls` is an optional per-sort null ordering hint:
 
   ```ts
@@ -161,7 +166,8 @@ const sorts = [
   - `'first'` → place all `NULL`s before non-NULLs for that sort
   - `'last'` → place all `NULL`s after non-NULLs for that sort
   - If omitted, the dialect’s defaults are used (see below).
-  - On dialects that **don’t** support `NULLS FIRST / LAST` (e.g. MySQL, MSSQL), providing `nulls` will throw a `PaginationError` at runtime — so only specify it when the dialect can express it.
+  - On dialects that **don’t** support `NULLS FIRST / LAST` (e.g. MySQL, MSSQL), providing `nulls` will throw a
+    `PaginationError` at runtime — so only specify it when the dialect can express it.
 
 ### Dialects
 
@@ -171,6 +177,8 @@ Built‑ins (imported from `kysely-cursor`):
 - `MysqlPaginationDialect`
 - `MssqlPaginationDialect`
 - `SqlitePaginationDialect`
+
+Construct with `new` (e.g. `new PostgresPaginationDialect()`). Custom dialects can extend `BasePaginationDialect`.
 
 ### Codecs
 
@@ -411,9 +419,24 @@ The library over‑fetches by `limit+1` to determine if there’s another page. 
 forward; an empty result returns no tokens.
 
 **How are NULLs handled?**
-You can now control this per sort via `nulls: 'first' | 'last'` on dialects that support it. If you omit it, the dialect’s
+You can control this per sort via `nulls: 'first' | 'last'` on dialects that support it. If you omit it, the dialect’s
 declared defaults are used, and descending sorts get the inverse of the ascending default. On dialects that can’t express
 null placement, specifying `nulls` throws an error so you don’t get silent drift.
+
+**When should I set `nullable: false`?**
+When a leading sort column truly has no NULLs (and you have a matching index). That lets the library use a simpler
+predicate for deep pages. Leave it unset if the column can be null — correctness comes first.
+
+**What is `keysetStrategy`?**
+Most apps never need this. Defaults to `auto` (use the best form the dialect supports). Set `portable` only if you want
+to avoid dialect-specific tuple/row comparisons:
+
+```ts
+const paginator = createPaginator({
+  dialect: new PostgresPaginationDialect(),
+  keysetStrategy: 'portable',
+})
+```
 
 ---
 
