@@ -1,53 +1,35 @@
 /**
  * Unit tests for bench CI gate (ratio + absolute Δ).
  * Pure predicate only — no Docker / DB.
+ *
+ * Imports `bench/src/gate` (not compare/types) so root `tsc` does not need a
+ * built `kysely-cursor` dist (CI typechecks before build).
  */
+import type { DialectName } from '../bench/src/config.js'
 import {
   cursorDeltaMs,
   DEFAULT_REGRESSION_THRESHOLD,
+  type GateCell,
   isGatingRegression,
   MIN_ABS_MS,
   MIN_GATE_DEPTH,
-} from '../bench/src/compare.js'
-import type { BaselineCell, CellDelta } from '../bench/src/types.js'
-
-const baseCell = (partial: Partial<BaselineCell> & Pick<BaselineCell, 'dialect' | 'cursorMean'>): BaselineCell => ({
-  scenario: 'scoreboard',
-  label: 'depth=500',
-  cursorP50: partial.cursorMean,
-  cursorP95: partial.cursorMean,
-  offsetMean: 10,
-  offsetP50: 10,
-  offsetP95: 10,
-  speedup: 2,
-  deltaMs: 5,
-  ...partial,
-})
+} from '../bench/src/gate.js'
 
 const delta = (opts: {
-  dialect?: BaselineCell['dialect']
-  scenario?: BaselineCell['scenario']
+  dialect?: DialectName
+  scenario?: string
   label?: string
   baseMs: number
   currMs: number
-  status?: CellDelta['status']
-}): CellDelta => {
-  const dialect = opts.dialect ?? 'postgres'
-  const baseline = baseCell({ dialect, cursorMean: opts.baseMs, scenario: opts.scenario, label: opts.label })
-  const current = baseCell({ dialect, cursorMean: opts.currMs, scenario: opts.scenario, label: opts.label })
-  const cursorRatio = opts.baseMs > 0 ? opts.currMs / opts.baseMs : Number.NaN
-  return {
-    key: `${dialect}|${baseline.scenario}|${baseline.label}`,
-    dialect,
-    scenario: baseline.scenario,
-    label: baseline.label,
-    baseline,
-    current,
-    cursorRatio,
-    speedupRatio: null,
-    status: opts.status ?? 'regression',
-  }
-}
+  status?: GateCell['status']
+}): GateCell => ({
+  dialect: opts.dialect ?? 'postgres',
+  scenario: opts.scenario ?? 'scoreboard',
+  label: opts.label ?? 'depth=500',
+  baseline: { cursorMean: opts.baseMs },
+  current: { cursorMean: opts.currMs },
+  status: opts.status ?? 'regression',
+})
 
 describe('isGatingRegression', () => {
   it('exposes the documented constants', () => {
