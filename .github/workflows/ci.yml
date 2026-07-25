@@ -17,6 +17,8 @@ concurrency:
 jobs:
   lint:
     name: Lint and Prettier
+    # Baseline bot commits use [skip ci] so we do not re-enter the bench → commit loop.
+    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -41,6 +43,7 @@ jobs:
         run: pnpm run format
 
   test:
+    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]')
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -79,3 +82,96 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+
+  # Cursor vs offset pagination benches (testcontainers). Commits a slim baseline on
+  # main; on PRs compares against that baseline and posts a sticky comment.
+  bench:
+    name: Benchmarks
+    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Needed so the baseline-update push can trigger without loops via [skip ci]
+          # and so we can push to the same ref on main.
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build library
+        run: pnpm run build
+
+      - name: Run benchmarks
+        # Full suite so results match the committed baseline shape/config.
+        # --compare diffs against bench/baseline/results.json.
+        # --fail-on-regression exits 1 when cursor mean ≥ 1.5× baseline.
+        # Continue so we still post the comment / update baseline on main when noisy.
+        id: bench
+        continue-on-error: true
+        run: >
+          pnpm --filter kysely-cursor-bench bench
+          -- --git-sha "${{ github.sha }}"
+          --compare
+          --fail-on-regression
+          --threshold 1.5
+          --comment-out results/pr-comment.md
+          --update-baseline
+
+      - name: Upload bench artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-results
+          path: |
+            bench/results/
+            bench/baseline/
+          if-no-files-found: ignore
+
+      - name: Comment benchmark report on PR
+        if: github.event_name == 'pull_request' && hashFiles('bench/results/pr-comment.md') != ''
+        continue-on-error: true
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: kysely-cursor-bench
+          path: bench/results/pr-comment.md
+
+      # Always record what main measured (even if the run flagged a regression),
+      # so `git show <sha>:bench/baseline/results.json` reflects that commit.
+      - name: Commit updated baseline on main
+        if: >
+          always() &&
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main' &&
+          steps.bench.outcome != 'cancelled' &&
+          hashFiles('bench/baseline/results.json') != ''
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bench/baseline/results.json bench/baseline/summary.md
+          if git diff --staged --quiet; then
+            echo "Baseline unchanged"
+            exit 0
+          fi
+          git commit -m "chore(bench): update baseline [skip ci]"
+          git push
+
+      - name: Fail job on regression
+        if: steps.bench.outcome == 'failure'
+        run: |
+          echo "Benchmark step failed (regression or runner error). See logs / PR comment."
+          exit 1

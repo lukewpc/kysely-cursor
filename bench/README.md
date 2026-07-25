@@ -61,8 +61,10 @@ pnpm --filter kysely-cursor-bench bench -- --dialect postgres,sqlite --rows 5000
 | `--walk-pages` | `150` (`40` with `--quick`)                  | Sequential-walk length                         |
 | `--iterations` | `12` (`5` with `--quick`)                    | Timed iterations per cell                      |
 | `--warmup`     | `3` (`1` with `--quick`)                     | Untimed warmup iterations                      |
-| `--out`        | `./bench/results`                            | Report output directory                        |
+| `--out`        | `./bench/results`                            | Ephemeral report output directory              |
 | `--quick`      | off                                          | Smaller dataset / fewer iterations             |
+| `--compare`    | off                                          | Diff vs committed baseline after the run       |
+| `--update-baseline` | off                                     | Write `bench/baseline/` (committed snapshot)   |
 
 ## Scenarios
 
@@ -170,24 +172,81 @@ cannot stay index-only.
 
 ## Reports
 
-Each run writes:
+### Ephemeral (gitignored)
 
 ```
 bench/results/
-  <timestamp>-report.md      # human-readable markdown
-  <timestamp>-results.json   # full sample data + stats
-  latest-report.md           # overwritten each run
+  <timestamp>-report.md      # concise markdown
+  <timestamp>-results.json   # slim baseline-shaped JSON (means / p50 / p95, no raw samples)
+  latest-report.md
   latest-results.json
+  pr-comment.md              # compare markdown (when --compare --comment-out …)
 ```
 
-Console output includes per-scenario tables (mean / p50 / p95), a headline
-deep-page summary, and written takeaways.
+### Committed baseline (tracked in git)
+
+```
+bench/baseline/
+  results.json   # slim numbers at the last successful main CI run
+  summary.md     # human-readable snapshot of that baseline
+```
+
+These are updated automatically on **push to `main`** by `.github/workflows/ci.yml`.
+That gives you per-commit visibility: `git show <sha>:bench/baseline/results.json`.
+
+Refresh locally after a full run you trust:
+
+```bash
+pnpm bench:update-baseline
+```
+
+### Compare / regressions
+
+```bash
+# After a run that wrote results/latest-results.json
+pnpm bench:compare
+
+# Or in one shot
+pnpm bench -- --compare --fail-on-regression --threshold 1.5
+```
+
+A **regression** is any matched cell whose **cursor mean** is ≥ `threshold`× the
+baseline (default **1.5**). The primary signal is library keyset latency, not
+offset (engine behavior we do not control).
+
+| Flag | Meaning |
+| --- | --- |
+| `--compare` | Diff current run (or `--current`) against baseline |
+| `--current <path>` | Compare-only mode; skip running benches |
+| `--baseline <path>` | Baseline JSON (default `bench/baseline/results.json`) |
+| `--threshold <n>` | Cursor-mean ratio that counts as a regression |
+| `--fail-on-regression` | Exit 1 when any cell is a regression |
+| `--comment-out <path>` | Write the compare markdown (for PR comments) |
+| `--update-baseline` | Write `bench/baseline/{results.json,summary.md}` |
+| `--git-sha <sha>` | Embed SHA in the JSON (CI sets this from `GITHUB_SHA`) |
+
+In CI, `--fail-on-regression` is **soft** until the baseline has a `gitSha`
+(i.e. was produced on GitHub Actions). Absolute ms from a laptop is not
+comparable to Actions runners.
+
+### CI (every PR + main)
+
+The **Benchmarks** job in `.github/workflows/ci.yml`:
+
+1. Builds the library and runs the **full** suite (same config as the baseline).
+2. Diffs against `bench/baseline/results.json`.
+3. On **pull_request**: posts a sticky PR comment with the compare report.
+4. On **push to main**: commits an updated `bench/baseline/*` with
+   `chore(bench): update baseline [skip ci]` so each main commit has a snapshot.
+5. Fails the job when a CI-produced baseline shows cursor-mean regressions ≥ 1.5×.
+
+Artifacts (`bench/results/`, `bench/baseline/`) are uploaded for every run.
 
 ### Reading the numbers
 
 - **Speedup** = `offset.mean / cursor.mean` (higher ⇒ cursor faster).
 - **Δ ms** = `offset.mean − cursor.mean` (positive ⇒ cursor faster).
-- Absolute ms depends on machine and container RTT; the **relative** gap is the signal.
+- Absolute ms depends on machine and container RTT; **baseline ratios on CI** are the regression signal.
 - Page 0 is often similar for both strategies (no skip). The gap opens as depth grows.
 - Compare **within a dialect**, not absolute ms across Postgres vs SQLite (containers vs in-process).
 

@@ -194,7 +194,9 @@ const paginator = createPaginator({
 })
 ```
 
-See `bench/` for latency/plan comparisons across dialects.
+See `bench/` for latency comparisons across dialects. CI runs the suite on every
+PR (sticky comment + regression check vs `bench/baseline/`) and refreshes the
+committed baseline on `main`.
 
 ### Dialects
 

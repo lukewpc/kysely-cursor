@@ -5,6 +5,9 @@
   "scripts": {
     "bench": "tsx src/index.ts",
     "bench:quick": "tsx src/index.ts --quick",
+    "bench:ci": "tsx src/index.ts --compare --fail-on-regression --comment-out results/pr-comment.md",
+    "bench:update-baseline": "tsx src/index.ts --update-baseline",
+    "bench:compare": "tsx src/index.ts --compare --current results/latest-results.json",
     "bench:postgres": "tsx src/index.ts --dialect postgres",
     "bench:mysql": "tsx src/index.ts --dialect mysql",
     "bench:mssql": "tsx src/index.ts --dialect mssql",

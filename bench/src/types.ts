@@ -80,18 +80,74 @@ export type DialectResult = {
   plans?: string[]
 }
 
+export type BenchReportConfig = {
+  rowCount: number
+  pageSize: number
+  deepPageDepths: number[]
+  walkPages: number
+  iterations: number
+  warmup: number
+  dialects: DialectName[]
+}
+
 export type BenchReport = {
   generatedAt: string
-  config: {
-    rowCount: number
-    pageSize: number
-    deepPageDepths: number[]
-    walkPages: number
-    iterations: number
-    warmup: number
-    dialects: DialectName[]
-  }
+  config: BenchReportConfig
   dialects: DialectResult[]
+}
+
+/** One measurement cell used for baselining and PR diffs (no raw samples). */
+export type BaselineCell = {
+  dialect: DialectName
+  scenario: ScenarioId
+  label: string
+  cursorMean: number
+  cursorP50: number
+  cursorP95: number
+  offsetMean: number
+  offsetP50: number
+  offsetP95: number
+  speedup: number
+  deltaMs: number
+}
+
+/**
+ * Committed / CI-facing artifact. Small enough to keep in git and comment on PRs.
+ * Version bumps if the shape changes incompatibly.
+ */
+export type BaselineReport = {
+  version: 1
+  generatedAt: string
+  /** Optional git SHA when produced in CI. */
+  gitSha?: string
+  config: BenchReportConfig
+  cells: BaselineCell[]
+}
+
+export type CellDelta = {
+  key: string
+  dialect: DialectName
+  scenario: ScenarioId
+  label: string
+  baseline: BaselineCell
+  current: BaselineCell
+  /** current.cursorMean / baseline.cursorMean */
+  cursorRatio: number
+  /** current.speedup / baseline.speedup (if both finite) */
+  speedupRatio: number | null
+  status: 'regression' | 'improvement' | 'stable'
+}
+
+export type CompareResult = {
+  baseline: BaselineReport
+  current: BaselineReport
+  /** Absolute cursor-mean ratio above which a cell is a regression (e.g. 1.5). */
+  threshold: number
+  matched: CellDelta[]
+  missingInCurrent: BaselineCell[]
+  newInCurrent: BaselineCell[]
+  regressions: CellDelta[]
+  improvements: CellDelta[]
 }
 
 export type DialectHandle = {
