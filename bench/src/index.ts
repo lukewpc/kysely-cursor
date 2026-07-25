@@ -245,8 +245,8 @@ const runCompare = async (opts: {
     const n = gatingRegressions(result).length
     console.error(
       `\nBenchmark regression: ${n} CI-gating cell(s) ≥ ${opts.threshold}× baseline cursor mean ` +
-        `and ≥ dialect abs floor (2ms remote / 0.5ms sqlite; library path, depth ≥ 100 or walks; ` +
-        `ideal-baseline / shallow / sub-floor Δ ignored).`,
+        `and ≥ dialect abs floor (2ms remote / 0.5ms sqlite; deep-page / sequential-walk only, ` +
+        `depth ≥ 100 or walks; other scenarios / shallow / sub-floor Δ ignored).`,
     )
     process.exitCode = 1
   }

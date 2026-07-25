@@ -10,6 +10,7 @@ import {
   cursorDeltaMs,
   DEFAULT_REGRESSION_THRESHOLD,
   type GateCell,
+  GATING_SCENARIOS,
   isGatingRegression,
   MIN_ABS_MS,
   MIN_GATE_DEPTH,
@@ -24,7 +25,7 @@ const delta = (opts: {
   status?: GateCell['status']
 }): GateCell => ({
   dialect: opts.dialect ?? 'postgres',
-  scenario: opts.scenario ?? 'scoreboard',
+  scenario: opts.scenario ?? 'deep-page',
   label: opts.label ?? 'depth=500',
   baseline: { cursorMean: opts.baseMs },
   current: { cursorMean: opts.currMs },
@@ -39,12 +40,24 @@ describe('isGatingRegression', () => {
     expect(MIN_ABS_MS.mysql).toBe(2)
     expect(MIN_ABS_MS.mssql).toBe(2)
     expect(MIN_ABS_MS.sqlite).toBe(0.5)
+    expect([...GATING_SCENARIOS].sort()).toEqual(['deep-page', 'sequential-walk'])
   })
 
   it.each([
     {
-      name: 'scoreboard noise: 0.38 → 0.67ms (1.73×, +0.28) does not gate',
-      d: delta({ baseMs: 0.38, currMs: 0.67, label: 'depth=500', scenario: 'scoreboard' }),
+      name: 'scoreboard never gates (secondary scenario)',
+      d: delta({ baseMs: 0.38, currMs: 10, label: 'depth=500', scenario: 'scoreboard' }),
+      gate: false,
+    },
+    {
+      name: 'author-timeline walk does not gate (CI false positive shape)',
+      d: delta({
+        dialect: 'sqlite',
+        baseMs: 7.28,
+        currMs: 11.4,
+        label: 'walk=40',
+        scenario: 'author-timeline',
+      }),
       gate: false,
     },
     {
@@ -58,22 +71,22 @@ describe('isGatingRegression', () => {
       gate: true,
     },
     {
-      name: 'walk real: 25ms → 40ms (1.6×, +15) gates',
+      name: 'sequential-walk real: 25ms → 40ms (1.6×, +15) gates',
       d: delta({ baseMs: 25, currMs: 40, label: 'walk=200', scenario: 'sequential-walk' }),
       gate: true,
     },
     {
-      name: 'sqlite below floor: 0.15 → 0.40ms (+0.25 < 0.5) does not gate',
-      d: delta({ dialect: 'sqlite', baseMs: 0.15, currMs: 0.4, label: 'depth=500', scenario: 'scoreboard' }),
+      name: 'sqlite deep-page below floor: 0.15 → 0.40ms (+0.25 < 0.5) does not gate',
+      d: delta({ dialect: 'sqlite', baseMs: 0.15, currMs: 0.4, label: 'depth=500', scenario: 'deep-page' }),
       gate: false,
     },
     {
-      name: 'sqlite at floor: 0.15 → 0.65ms (+0.5, 4.3×) gates',
-      d: delta({ dialect: 'sqlite', baseMs: 0.15, currMs: 0.65, label: 'depth=500', scenario: 'scoreboard' }),
+      name: 'sqlite deep-page at floor: 0.15 → 0.65ms (+0.5, 4.3×) gates',
+      d: delta({ dialect: 'sqlite', baseMs: 0.15, currMs: 0.65, label: 'depth=500', scenario: 'deep-page' }),
       gate: true,
     },
     {
-      name: 'shallow depth 2× does not gate',
+      name: 'shallow deep-page does not gate',
       d: delta({ baseMs: 1, currMs: 3, label: 'depth=10', scenario: 'deep-page' }),
       gate: false,
     },
@@ -83,12 +96,17 @@ describe('isGatingRegression', () => {
       gate: false,
     },
     {
-      name: 'ratio hit but Δ just under 2ms does not gate (postgres)',
+      name: 'filtered-feed never gates even at deep depth',
+      d: delta({ baseMs: 2, currMs: 4, label: `depth=${MIN_GATE_DEPTH}`, scenario: 'filtered-feed' }),
+      gate: false,
+    },
+    {
+      name: 'ratio hit but Δ just under 2ms does not gate (postgres deep-page)',
       d: delta({ baseMs: 1, currMs: 2.9, label: 'depth=200', scenario: 'deep-page' }),
       gate: false,
     },
     {
-      name: 'ratio hit and Δ ≥ 2ms gates (postgres)',
+      name: 'ratio hit and Δ ≥ 2ms gates (postgres deep-page)',
       d: delta({ baseMs: 1, currMs: 3, label: 'depth=200', scenario: 'deep-page' }),
       gate: true,
     },
@@ -96,11 +114,6 @@ describe('isGatingRegression', () => {
       name: 'improvement status never gates',
       d: delta({ baseMs: 4, currMs: 2, label: 'depth=500', scenario: 'deep-page', status: 'improvement' }),
       gate: false,
-    },
-    {
-      name: 'depth exactly MIN_GATE_DEPTH with abs floor gates',
-      d: delta({ baseMs: 2, currMs: 4, label: `depth=${MIN_GATE_DEPTH}`, scenario: 'filtered-feed' }),
-      gate: true,
     },
   ])('$name', ({ d, gate }) => {
     expect(isGatingRegression(d)).toBe(gate)

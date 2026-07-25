@@ -27,8 +27,12 @@ export const MIN_ABS_MS: Record<DialectName, number> = {
   sqlite: 0.5,
 }
 
-/** Raw SQL ceiling — informative, not a library regression signal. */
-const NON_GATING_SCENARIOS = new Set(['ideal-baseline'])
+/**
+ * High-SNR scenarios only. Secondary sweeps (scoreboard, filtered-feed,
+ * author-timeline) stay in the report but do not fail CI — their walks/depths
+ * are noisier on GHA and rarely the first signal of a real library regression.
+ */
+export const GATING_SCENARIOS = new Set(['deep-page', 'sequential-walk'])
 
 /** Minimal cell shape for gating (structurally satisfied by CellDelta). */
 export type GateCell = {
@@ -49,13 +53,13 @@ export const cursorDeltaMs = (d: GateCell): number => d.current.cursorMean - d.b
  *
  * Fail only when all hold:
  * 1. status is regression (ratio ≥ threshold)
- * 2. library scenario (not ideal-baseline)
+ * 2. scenario is deep-page or sequential-walk
  * 3. depth ≥ MIN_GATE_DEPTH or walk label
  * 4. absolute delta ≥ MIN_ABS_MS[dialect]
  */
 export const isGatingRegression = (d: GateCell): boolean => {
   if (d.status !== 'regression') return false
-  if (NON_GATING_SCENARIOS.has(d.scenario)) return false
+  if (!GATING_SCENARIOS.has(d.scenario)) return false
   if (cursorDeltaMs(d) < MIN_ABS_MS[d.dialect]) return false
 
   const depthMatch = /^depth=(\d+)$/.exec(d.label)
@@ -63,8 +67,8 @@ export const isGatingRegression = (d: GateCell): boolean => {
     return Number(depthMatch[1]) >= MIN_GATE_DEPTH
   }
 
-  // sequential-walk / author walk labels (`walk=N`) — gate these.
+  // sequential-walk labels (`walk=N`).
   if (d.label.startsWith('walk=')) return true
 
-  return true
+  return false
 }

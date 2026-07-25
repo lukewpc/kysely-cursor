@@ -224,13 +224,14 @@ keyset latency, not offset (engine behavior we do not control).
 
 **CI gating** (`--fail-on-regression`) fails the job only when **all** hold:
 
-1. Library scenario (not `ideal-baseline`)
+1. Scenario is **`deep-page`** or **`sequential-walk`** (other library scenarios stay informational)
 2. **depth ≥ 100** or a **walk** label (`walk=…`)
 3. Cursor-mean ratio ≥ `threshold` (default **1.5×**)
 4. Absolute slowdown ≥ dialect floor: **2ms** for postgres/mysql/mssql, **0.5ms** for sqlite
 
-Ratio spikes below the absolute floor (common on flat sub-ms cells) stay in the
-report under **Noisy / weak** and do not red the job.
+Ratio spikes below the absolute floor, shallow depths, and secondary scenarios
+(scoreboard, filtered-feed, author-timeline, ideal-baseline) stay under
+**Noisy / weak** and do not red the job.
 
 | Flag                   | Meaning                                                          |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -256,9 +257,9 @@ Benchmarks run as a **dialect matrix** in `.github/workflows/ci.yml`
 1. Each **Bench (dialect)** job builds the library, runs that dialect only
    (same seed/page/depth config as the committed baseline), and diffs its cells
    against `bench/baseline/results.json` (compare scopes to dialects present in
-   the current run). The job fails on **CI-gating** regressions (library path,
-   depth ≥ 100 or walks, ≥ 1.5× **and** ≥ abs ms floor) when the baseline was
-   produced on CI (`gitSha` set).
+   the current run). The job fails on **CI-gating** regressions (`deep-page` /
+   `sequential-walk`, depth ≥ 100 or walks, ≥ 1.5× **and** ≥ abs ms floor) when
+   the baseline was produced on CI (`gitSha` set).
 2. **Bench report** downloads all dialect artifacts, merges them with
    `--merge bench/artifacts`, and:
    - On **pull_request**: posts a sticky PR comment with the combined compare report.

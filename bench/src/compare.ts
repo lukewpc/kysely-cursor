@@ -3,7 +3,14 @@ import { cellKey } from './baseline.js'
 import { DEFAULT_REGRESSION_THRESHOLD, isGatingRegression, MIN_ABS_MS, MIN_GATE_DEPTH } from './gate.js'
 import { formatMs, formatSpeedup } from './metrics.js'
 
-export { cursorDeltaMs, DEFAULT_REGRESSION_THRESHOLD, isGatingRegression, MIN_ABS_MS, MIN_GATE_DEPTH } from './gate.js'
+export {
+  cursorDeltaMs,
+  DEFAULT_REGRESSION_THRESHOLD,
+  GATING_SCENARIOS,
+  isGatingRegression,
+  MIN_ABS_MS,
+  MIN_GATE_DEPTH,
+} from './gate.js'
 
 const safeRatio = (current: number, baseline: number): number => {
   if (!Number.isFinite(current) || !Number.isFinite(baseline) || baseline <= 0) {
@@ -191,7 +198,7 @@ export const renderCompareMarkdown = (result: CompareResult): string => {
   }
 
   lines.push(
-    `_Gate: library · depth ≥ ${MIN_GATE_DEPTH} or walk · ≥ ${threshold}× · Δ ≥ ${MIN_ABS_MS.postgres}ms (sqlite ${MIN_ABS_MS.sqlite}ms) · [bench/README.md](bench/README.md)_`,
+    `_Gate: deep-page / sequential-walk · depth ≥ ${MIN_GATE_DEPTH} or walk · ≥ ${threshold}× · Δ ≥ ${MIN_ABS_MS.postgres}ms (sqlite ${MIN_ABS_MS.sqlite}ms) · [bench/README.md](bench/README.md)_`,
   )
   lines.push('')
 
