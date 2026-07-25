@@ -1,5 +1,4 @@
-# Local Postgres for the kysely-cursor example.
-# Managed via package.json: pnpm db:up | db:down | start
+# Local Postgres for the kysely-cursor example (pnpm db:up | db:down | start).
 name: kysely-cursor-example-postgres
 
 services:
@@ -10,7 +9,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: kysely_cursor_example
     ports:
-      # Dedicated host port so we don't fight a system Postgres on 5432.
+      # Host 54329 avoids clashing with a system Postgres on 5432.
       - '54329:5432'
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U postgres -d kysely_cursor_example']

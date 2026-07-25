@@ -15,31 +15,21 @@ Cursor‑based (keyset) pagination utilities for [Kysely](https://github.com/kys
 
 ## Table of contents
 
-- [Kysely Cursor](#kysely-cursor)
-  - [Table of contents](#table-of-contents)
-  - [Why keyset pagination?](#why-keyset-pagination)
-  - [Features](#features)
-  - [Install](#install)
-  - [Quick start](#quick-start)
-    - [Warning: this project is in early development, so does not support cross-version token compatiablity](#warning-this-project-is-in-early-development-so-does-not-support-cross-version-token-compatiablity)
-  - [Concepts](#concepts)
-    - [Sorts](#sorts)
-    - [Dialects](#dialects)
-    - [Codecs](#codecs)
-    - [Null Sorting Behavior](#null-sorting-behavior)
-      - [Current behavior](#current-behavior)
-  - [API](#api)
-    - [`createPaginator`](#createpaginator)
-    - [`paginate` (low-level)](#paginate-low-level)
-    - [`paginateWithEdges` (low-level)](#paginatewithedges-low-level)
-  - [Examples](#examples)
-    - [Forward/back pagination](#forwardback-pagination)
-    - [Offset fallback](#offset-fallback)
-    - [Custom codec pipelines](#custom-codec-pipelines)
-  - [Benchmarks](#benchmarks)
-  - [Error Handling](#error-handling)
-  - [FAQ](#faq)
-    - [Acknowledgements](#acknowledgements)
+- [Why keyset pagination?](#why-keyset-pagination)
+- [Features](#features)
+- [Install](#install)
+- [Quick start](#quick-start)
+- [Concepts](#concepts)
+  - [Sorts](#sorts)
+  - [Dialects](#dialects)
+  - [Codecs](#codecs)
+  - [Null ordering](#null-ordering)
+- [API](#api)
+- [Examples](#examples)
+- [Benchmarks](#benchmarks)
+- [Error Handling](#error-handling)
+- [FAQ](#faq)
+- [Acknowledgements](#acknowledgements)
 
 ---
 
@@ -92,7 +82,7 @@ yarn add kysely-cursor
 
 ## Quick start
 
-### Warning: this project is in early development, so does not support cross-version token compatiablity
+> **Warning:** This project is in early development and does not support cross-version token compatibility.
 
 ```ts
 import { Kysely } from 'kysely'
@@ -194,10 +184,9 @@ Provided:
 
 The default cursor codec is `codecPipe(superJsonCodec, base64UrlCodec)`.
 
-### Null Sorting Behavior
+### Null ordering
 
-Handling of `NULL` values during sorting differs between database engines.
-To ensure consistent pagination behavior across dialects, this library now supports **explicit** null ordering on each sort key (`nulls: 'first' | 'last'`) and falls back to dialect-aware defaults when it’s not provided.
+NULL placement differs between engines. Set `nulls: 'first' | 'last'` on a sort key when you need an explicit order; omit it to use the dialect default.
 
 | Database System                  | Default NULLs (ASC) | Default NULLs (DESC) | Supports `NULLS FIRST / LAST`? |
 | -------------------------------- | ------------------- | -------------------- | ------------------------------ |
@@ -206,25 +195,13 @@ To ensure consistent pagination behavior across dialects, this library now suppo
 | **Microsoft SQL Server (MSSQL)** | NULLs **first**     | NULLs **last**       | ❌ Not supported               |
 | **SQLite**                       | NULLs **first**     | NULLs **last**       | ✅ Supported since 3.30.0      |
 
-#### Current behavior
-
-1. **You can set it yourself**
-   On sorts where the column can be nullable, add:
-
 ```ts
 const sort = { col: 'posts.published_at', dir: 'asc', nulls: 'last' }
 ```
 
-If the dialect supports `NULLS FIRST / LAST` (Postgres, SQLite ≥ 3.30.0), this will be emitted as part of the `ORDER BY`. If it **doesn’t** (MySQL, MSSQL), the library throws a `PaginationError` with `code: 'INVALID_SORT'`, so you don’t silently get inconsistent pagination.
+On dialects that support `NULLS FIRST / LAST` (Postgres, SQLite ≥ 3.30.0), this is emitted in the `ORDER BY`. On MySQL and MSSQL, providing `nulls` throws a `PaginationError` with `code: 'INVALID_SORT'` so you don’t silently get inconsistent pagination.
 
-2. **If you don’t set it, the dialect decides**
-   Each dialect declares:
-   - whether it supports explicit null directives
-   - what its default “ascending NULL placement” is
-
-   The paginator then:
-   - uses that default when `dir === 'asc'`
-   - uses the **inverted** default when `dir === 'desc'` (so if ASC puts NULLs first, DESC will put them last)
+When `nulls` is omitted, the dialect’s ascending default is used for `dir: 'asc'`, and the inverted default for `dir: 'desc'`.
 
 ---
 
@@ -389,8 +366,7 @@ const cursorCodec = stashCodec(stash)
 
 ## Benchmarks
 
-Multi-dialect cursor vs offset suite lives in [`bench/`](./bench) (Testcontainers for Postgres / MySQL / MSSQL; local
-SQLite).
+Cursor vs offset benchmarks for every dialect live in [`bench/`](./bench).
 
 ```bash
 pnpm bench:quick          # smoke
@@ -400,10 +376,7 @@ pnpm bench:compare        # vs committed bench/baseline/
 pnpm bench:update-baseline
 ```
 
-CI runs each dialect in parallel on the **lean** profile (deep-page + sequential-walk only), posts a
-sticky PR comparison comment, and fails on CI-gating cursor-mean regressions (≥ 1.5× **and** ≥ dialect
-abs ms floor). Successful pushes to `main` refresh `bench/baseline/` only when every dialect job is
-green (`[skip ci]` bot commit). Failed / regressed main runs do not overwrite the baseline.
+See [`bench/README.md`](./bench/README.md) for methodology, CI regression gating, and how to interpret results.
 
 ---
 
@@ -459,6 +432,6 @@ const paginator = createPaginator({
 
 ---
 
-### Acknowledgements
+## Acknowledgements
 
 Built on the excellent [Kysely](https://github.com/kysely-org/kysely).

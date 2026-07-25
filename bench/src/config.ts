@@ -19,11 +19,6 @@ export const ALL_SCENARIOS: ScenarioId[] = [
   'ideal-baseline',
 ]
 
-/**
- * Default / CI profile: high-SNR cells only.
- * Matches the CI gate (deep-page + sequential-walk) and keeps PR wall time ~30s
- * where the engine allows (MSSQL container start still dominates that dialect).
- */
 export const CI_SCENARIOS: ScenarioId[] = ['deep-page', 'sequential-walk']
 
 export type BenchConfig = {
@@ -48,7 +43,7 @@ export type BenchConfig = {
   resultsDir: string
   /** Skip container dialects that require Docker. */
   quick: boolean
-  /** Full poster matrix (all scenarios, denser depths). */
+  /** All scenarios with denser depths. */
   full: boolean
 }
 
