@@ -4,6 +4,15 @@ import { formatMs, formatSpeedup } from './metrics.js'
 
 export const DEFAULT_REGRESSION_THRESHOLD = 1.5
 
+/**
+ * Shallow depths and sub-ms cells are dominated by runner noise on GHA.
+ * Only enforce fail-on-regression for library pages at this depth and deeper.
+ */
+export const MIN_GATE_DEPTH = 100
+
+/** Raw SQL ceiling — informative, not a library regression signal. */
+const NON_GATING_SCENARIOS = new Set(['ideal-baseline'])
+
 const safeRatio = (current: number, baseline: number): number => {
   if (!Number.isFinite(current) || !Number.isFinite(baseline) || baseline <= 0) {
     return Number.NaN
@@ -17,6 +26,27 @@ const statusFor = (cursorRatio: number, threshold: number): CellDelta['status'] 
   if (cursorRatio <= 1 / threshold) return 'improvement'
   return 'stable'
 }
+
+/**
+ * Whether a cell regression should fail CI (`--fail-on-regression`).
+ * Still listed in the report when true or false; only gating ones set exit 1.
+ */
+export const isGatingRegression = (d: CellDelta): boolean => {
+  if (d.status !== 'regression') return false
+  if (NON_GATING_SCENARIOS.has(d.scenario)) return false
+
+  const depthMatch = /^depth=(\d+)$/.exec(d.label)
+  if (depthMatch) {
+    return Number(depthMatch[1]) >= MIN_GATE_DEPTH
+  }
+
+  // sequential-walk / author walk labels (`walk=N`) — gate these.
+  if (d.label.startsWith('walk=')) return true
+
+  return true
+}
+
+export const gatingRegressions = (result: CompareResult): CellDelta[] => result.regressions.filter(isGatingRegression)
 
 /** Shape fields that must match for ratios to be meaningful (dialect list excluded). */
 export const configShapeKey = (
@@ -109,17 +139,20 @@ const formatConfigLine = (b: BaselineReport): string => {
 export const renderCompareMarkdown = (result: CompareResult): string => {
   const lines: string[] = []
   const { baseline, current, threshold, matched, regressions, improvements } = result
+  const gated = gatingRegressions(result)
+  const noise = regressions.filter((d) => !isGatingRegression(d))
 
-  const hasFail = regressions.length > 0
   // Dialect list may be a subset (matrix jobs); only shape fields gate ratio meaning.
   const configMismatch = configShapeKey(baseline.config) !== configShapeKey(current.config)
 
   lines.push(`# Benchmark comparison`)
   lines.push('')
   lines.push(
-    hasFail
-      ? `**Status: ⚠️ ${regressions.length} regression(s)** (cursor mean ≥ ${threshold}× baseline)`
-      : `**Status: ✅ no regressions** (threshold ${threshold}× on cursor mean)`,
+    gated.length > 0
+      ? `**Status: ⚠️ ${gated.length} CI-gating regression(s)** (library path, depth ≥ ${MIN_GATE_DEPTH} or walks; cursor mean ≥ ${threshold}× baseline)`
+      : regressions.length > 0
+        ? `**Status: ✅ no CI-gating regressions** (${regressions.length} noisy / non-gated cell(s) above ${threshold}× — informational only)`
+        : `**Status: ✅ no regressions** (threshold ${threshold}× on cursor mean)`,
   )
   if (configMismatch) {
     lines.push('')
@@ -132,16 +165,34 @@ export const renderCompareMarkdown = (result: CompareResult): string => {
   lines.push(`| **Current** | ${current.generatedAt} | ${formatConfigLine(current)} |`)
   lines.push('')
   lines.push(
-    'Primary signal: **cursor mean** latency (library path). Absolute ms varies by runner; ratios vs the committed baseline are what matter.',
+    'Primary signal: **cursor mean** latency (library path). Absolute ms varies by runner; ratios vs the committed baseline are what matter. ' +
+      `CI fails only on library scenarios at **depth ≥ ${MIN_GATE_DEPTH}** or sequential walks — not \`ideal-baseline\` or shallow depths.`,
   )
   lines.push('')
 
-  if (regressions.length) {
-    lines.push('## Regressions')
+  if (gated.length) {
+    lines.push('## CI-gating regressions')
     lines.push('')
     lines.push('| Dialect | Scenario | Label | Baseline cursor | Current cursor | Δ |')
     lines.push('| --- | --- | --- | ---: | ---: | ---: |')
-    for (const d of regressions) {
+    for (const d of gated) {
+      lines.push(
+        `| ${d.dialect} | ${d.scenario} | ${d.label} | ${formatMs(d.baseline.cursorMean)} | ${formatMs(d.current.cursorMean)} | ${formatRatio(d.cursorRatio)} |`,
+      )
+    }
+    lines.push('')
+  }
+
+  if (noise.length) {
+    lines.push('## Noisy / non-gated (informational)')
+    lines.push('')
+    lines.push(
+      `_Ideal-baseline and shallow depths (depth < ${MIN_GATE_DEPTH}) do not fail CI — runner jitter often dominates sub-ms cells._`,
+    )
+    lines.push('')
+    lines.push('| Dialect | Scenario | Label | Baseline cursor | Current cursor | Δ |')
+    lines.push('| --- | --- | --- | ---: | ---: | ---: |')
+    for (const d of noise) {
       lines.push(
         `| ${d.dialect} | ${d.scenario} | ${d.label} | ${formatMs(d.baseline.cursorMean)} | ${formatMs(d.current.cursorMean)} | ${formatRatio(d.cursorRatio)} |`,
       )
@@ -238,10 +289,14 @@ export const renderCompareMarkdown = (result: CompareResult): string => {
 
   lines.push('---')
   lines.push('')
-  lines.push(`_Threshold: cursor mean ≥ ${threshold}× baseline = regression. See \`bench/README.md\`._`)
+  lines.push(
+    `_CI gate: library scenarios, depth ≥ ${MIN_GATE_DEPTH} or \`walk=*\`, cursor mean ≥ ${threshold}× baseline. ` +
+      `See \`bench/README.md\`._`,
+  )
   lines.push('')
 
   return lines.join('\n')
 }
 
-export const hasRegressions = (result: CompareResult): boolean => result.regressions.length > 0
+/** True when any regression should fail `--fail-on-regression` (not all report rows). */
+export const hasRegressions = (result: CompareResult): boolean => gatingRegressions(result).length > 0

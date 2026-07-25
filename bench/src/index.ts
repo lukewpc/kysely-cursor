@@ -3,7 +3,13 @@ import { access, readdir, stat } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 
 import { DEFAULT_BASELINE_DIR, DEFAULT_BASELINE_JSON, loadBaseline, mergeBaselines, writeBaseline } from './baseline.js'
-import { compareBaselines, DEFAULT_REGRESSION_THRESHOLD, hasRegressions, renderCompareMarkdown } from './compare.js'
+import {
+  compareBaselines,
+  DEFAULT_REGRESSION_THRESHOLD,
+  gatingRegressions,
+  hasRegressions,
+  renderCompareMarkdown,
+} from './compare.js'
 import { describeConfig, parseArgs } from './config.js'
 import { renderBaselineMarkdown, renderConsole, writeReports } from './report.js'
 import type { BaselineReport, BenchReport } from './types.js'
@@ -236,8 +242,10 @@ const runCompare = async (opts: {
   }
 
   if (enforce && hasRegressions(result)) {
+    const n = gatingRegressions(result).length
     console.error(
-      `\nBenchmark regression: ${result.regressions.length} cell(s) ≥ ${opts.threshold}× baseline cursor mean.`,
+      `\nBenchmark regression: ${n} CI-gating cell(s) ≥ ${opts.threshold}× baseline cursor mean ` +
+        `(library path, depth ≥ 100 or walks; ideal-baseline / shallow depths ignored).`,
     )
     process.exitCode = 1
   }
