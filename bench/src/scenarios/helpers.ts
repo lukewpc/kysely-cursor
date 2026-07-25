@@ -2,19 +2,11 @@ import type { SelectQueryBuilder } from 'kysely'
 import type { Paginator } from 'kysely-cursor'
 
 import { measure, samplesFor, summarize } from '../metrics.js'
-import type {
-  ComparisonRow,
-  DialectHandle,
-  Post,
-  Sample,
-  ScenarioContext,
-  ScenarioId,
-  Strategy,
-} from '../types.js'
+import type { ComparisonRow, DialectHandle, Post, Sample, ScenarioContext, ScenarioId, Strategy } from '../types.js'
 
 export type QueryFactory = () => SelectQueryBuilder<any, any, Post>
 
-export type SortSpec = readonly { col: any; dir?: any; output?: any; nulls?: any }[]
+export type SortSpec = readonly { col: any; dir?: any; output?: any; nulls?: any; nullable?: boolean }[]
 
 /**
  * Walk forward `depth` pages with keyset cursors and return the nextPage token
@@ -129,8 +121,7 @@ export const walkOffset = async (
 /** Select list includes non-indexed `body` so deep OFFSET cannot be index-only. */
 const POST_COLUMNS = ['id', 'author_id', 'title', 'body', 'status', 'score', 'created_at'] as const
 
-export const basePostsQuery = (handle: DialectHandle) =>
-  handle.db.selectFrom('posts').select(POST_COLUMNS)
+export const basePostsQuery = (handle: DialectHandle) => handle.db.selectFrom('posts').select(POST_COLUMNS)
 
 export const publishedPostsQuery = (handle: DialectHandle) =>
   handle.db.selectFrom('posts').select(POST_COLUMNS).where('status', '=', 'published')

@@ -49,6 +49,7 @@ const TestDialect: PaginationDialect = {
   meta: {
     supportsNullSortDirective: true,
     defaultNullsSortAsc: 'last',
+    supportsRowValueCompare: true,
   },
   applyLimit: (builder, limit) => ((builder as any).limit ? (builder as any).limit(limit) : builder),
   applyOffset: (builder) => builder,

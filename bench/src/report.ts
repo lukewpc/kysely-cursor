@@ -56,12 +56,14 @@ const renderSummaryTable = (report: BenchReport): string => {
   if (rows.length === 0) return 'No comparisons recorded.'
 
   // Highlight the deepest deep-page per dialect — the headline number.
-  const headlines = report.dialects.map((d) => {
-    const deep = d.scenarios.find((s) => s.scenario === 'deep-page')
-    if (!deep || deep.comparisons.length === 0) return null
-    const deepest = deep.comparisons[deep.comparisons.length - 1]!
-    return deepest
-  }).filter((x): x is ComparisonRow => x !== null)
+  const headlines = report.dialects
+    .map((d) => {
+      const deep = d.scenarios.find((s) => s.scenario === 'deep-page')
+      if (!deep || deep.comparisons.length === 0) return null
+      const deepest = deep.comparisons[deep.comparisons.length - 1]!
+      return deepest
+    })
+    .filter((x): x is ComparisonRow => x !== null)
 
   const lines: string[] = []
   lines.push('── Headline: deepest single-page fetch (cursor vs offset) ──')
@@ -104,9 +106,7 @@ const renderTakeaways = (report: BenchReport): string => {
 
   const lines: string[] = []
   lines.push('── Takeaways ──')
-  lines.push(
-    `  • ${cursorWins} measurement(s) favor cursor (>1.05×), ${offsetWins} favor offset (<0.95×)`,
-  )
+  lines.push(`  • ${cursorWins} measurement(s) favor cursor (>1.05×), ${offsetWins} favor offset (<0.95×)`)
   lines.push(`  • Median cursor speedup across all cells: ${formatSpeedup(median)}`)
   lines.push(
     `  • Best cursor advantage: ${formatSpeedup(max.speedup)} (${max.dialect} / ${max.scenario} / ${max.label})`,
@@ -131,30 +131,14 @@ const renderTakeaways = (report: BenchReport): string => {
     )
   }
 
-  lines.push(
-    '  • Shallow pages are often similar for both strategies (one page of work either way).',
-  )
-  lines.push(
-    '  • Library keyset predicates are null-safe (`col IS NOT NULL AND col < $1` inside OR',
-  )
-  lines.push(
-    '    trees). On some engines that shape is applied as a Filter over an index walk',
-  )
-  lines.push(
-    '    (Rows Removed by Filter ≈ OFFSET), not as an Index Cond range seek — see plans.',
-  )
-  lines.push(
-    '  • The ideal-baseline scenario shows textbook keyset SQL without the library’s',
-  )
-  lines.push(
-    '    null-safe tree or token codec; use it as the theoretical ceiling.',
-  )
-  lines.push(
-    '  • Cursor still wins on correctness under concurrent inserts/deletes (no skipped/',
-  )
-  lines.push(
-    '    duplicated rows). Prefer cursor for infinite scroll; offset for jump-to-page-N.',
-  )
+  lines.push('  • Shallow pages are often similar for both strategies (one page of work either way).')
+  lines.push('  • Default (unmarked) leading sorts use null-safe OR trees. Mark non-null keys with')
+  lines.push('    `nullable: false` so the library can emit plain OR or row compare (Postgres/SQLite/')
+  lines.push('    MySQL). Row compare becomes an Index Cond seek on Postgres; see plans.')
+  lines.push('  • The ideal-baseline scenario shows textbook keyset SQL without the library’s')
+  lines.push('    token codec; with `nullable: false` the library deep-page path should approach it.')
+  lines.push('  • Cursor still wins on correctness under concurrent inserts/deletes (no skipped/')
+  lines.push('    duplicated rows). Prefer cursor for infinite scroll; offset for jump-to-page-N.')
   return lines.join('\n')
 }
 
@@ -177,9 +161,7 @@ export const renderMarkdown = (report: BenchReport): string => {
   lines.push('')
   lines.push('## What is being measured')
   lines.push('')
-  lines.push(
-    'Both strategies use the same `createPaginator` API from **kysely-cursor**:',
-  )
+  lines.push('Both strategies use the same `createPaginator` API from **kysely-cursor**:')
   lines.push('')
   lines.push('- **Cursor (keyset)** — `cursor: { nextPage: token }` (or first page with no cursor)')
   lines.push('- **Offset** — `cursor: { offset: n }` (built-in offset fallback)')
@@ -267,5 +249,3 @@ export const writeReports = async (
 
   return { markdownPath, jsonPath }
 }
-
-

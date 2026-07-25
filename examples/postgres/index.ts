@@ -51,8 +51,8 @@ async function main() {
     const paginator = createPaginator({ dialect: PostgresPaginationDialect })
 
     const sorts = [
-      { col: 'created_at', dir: 'desc' },
-      { col: 'id', dir: 'desc' }, // final non-nullable sort for deterministic ordering
+      { col: 'created_at', dir: 'desc', nullable: false },
+      { col: 'id', dir: 'desc' }, // final non-nullable unique sort
     ] as const
     const limit = 5
 

@@ -18,6 +18,19 @@ export type NullsDirection = 'first' | 'last'
 export type SortItem<DB, TB extends keyof DB, O, Allowed> = {
   dir?: OrderByDirection
   nulls?: null extends Allowed ? NullsDirection : undefined
+  /**
+   * Whether this sort key may contain NULL values.
+   *
+   * - Default / `true`: treated as nullable. Leading keys stay on the
+   *   null-safe keyset predicate path.
+   * - `false`: asserts the column has no NULLs so the library may emit
+   *   faster non-null SQL (`plain_or` / `row_compare`) when all non-final
+   *   keys opt in and other preconditions hold.
+   *
+   * Only meaningful for non-final sorts (the final key is already required
+   * to be non-null). This is a runtime assertion — not inferred from types.
+   */
+  nullable?: boolean
 } & (
   | {
       col: ReferenceExpression<DB, TB>

@@ -9,6 +9,8 @@ export class MssqlPaginationDialect extends BasePaginationDialect {
   meta = {
     supportsNullSortDirective: false,
     defaultNullsSortAsc: 'first' as const,
+    // No portable SQL row-value comparison on MSSQL.
+    supportsRowValueCompare: false,
   }
 
   override applyLimit<DB, TB extends keyof DB, O>(

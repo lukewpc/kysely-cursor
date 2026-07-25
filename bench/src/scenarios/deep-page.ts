@@ -46,8 +46,13 @@ export const runDeepPage = async (ctx: ScenarioContext): Promise<ScenarioResult>
     scenario: 'deep-page',
     title: 'Deep page (single request at depth N)',
     description:
-      'Library API: one page at increasing depths. Cursor tokens are pre-resolved so only the page query is timed. Offset uses OFFSET = depth × pageSize. Measures createPaginator cursor vs offset paths as the library emits them (null-safe keyset predicates + token codec).',
+      'Library API: one page at increasing depths. Cursor tokens are pre-resolved so only the page query is timed. Offset uses OFFSET = depth × pageSize. Feed sorts use nullable: false so the library emits seek-friendly keyset SQL (row compare / plain OR) plus the token codec.',
     samples,
-    comparisons: buildComparisons(handle.name, 'deep-page', samples, deepPageDepths.map((d) => `depth=${d}`)),
+    comparisons: buildComparisons(
+      handle.name,
+      'deep-page',
+      samples,
+      deepPageDepths.map((d) => `depth=${d}`),
+    ),
   }
 }

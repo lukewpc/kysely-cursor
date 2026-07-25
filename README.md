@@ -112,9 +112,9 @@ const paginator = createPaginator({
 })
 
 const sorts = [
-  // nullable leading sorts are allowed; final sort must be unique & non‑nullable
-  { col: 'users.created_at', dir: 'desc', output: 'created_at' },
-  { col: 'users.id', dir: 'desc', output: 'id' },
+  // mark non-null leading keys for seek-friendly SQL (optional; default stays null-safe)
+  { col: 'users.created_at', dir: 'desc', output: 'created_at', nullable: false },
+  { col: 'users.id', dir: 'desc', output: 'id' }, // final must be unique & non‑nullable
 ] as const
 
 const page1 = await paginator.paginate({
@@ -141,7 +141,7 @@ Provide an ordered **sort set** that uniquely identifies rows:
 
 ```ts
 const sorts = [
-  { col: 'users.created_at', dir: 'desc', output: 'created_at', nulls: 'last' },
+  { col: 'users.created_at', dir: 'desc', output: 'created_at', nullable: false },
   { col: 'users.id', dir: 'desc', output: 'id' }, // final non‑nullable & unique key
 ] as const
 ```
@@ -149,9 +149,11 @@ const sorts = [
 - Leading sorts take precedence over later sorts.
 - Leading sorts may be nullable; the **final sort must be non-nullable & unique**.
 - Use a primary key or a unique index for the final sort — this acts as a tie-breaker.
+- Prefer a composite index that matches the sort, e.g. `(created_at DESC, id DESC)`.
 - `dir` is the sort direction. Defaults to `asc`.
 - `col` is the field to sort by, optionally qualified.
 - `output` is the field name in your outputted rows. Defaults to `col`, without the qualifying prefix. May need to be explicitly set if your `col` is aliased in your select statement.
+- `nullable` opts a **leading** key into faster keyset SQL when you assert it has no NULLs (see [Keyset predicates](#keyset-predicates)). Defaults to treating leading keys as nullable.
 - `nulls` is an optional per-sort null ordering hint:
 
   ```ts
@@ -162,6 +164,38 @@ const sorts = [
   - `'last'` → place all `NULL`s after non-NULLs for that sort
   - If omitted, the dialect’s defaults are used (see below).
   - On dialects that **don’t** support `NULLS FIRST / LAST` (e.g. MySQL, MSSQL), providing `nulls` will throw a `PaginationError` at runtime — so only specify it when the dialect can express it.
+  - Explicit `nulls` always uses the null-safe predicate path (even if `nullable: false`).
+
+### Keyset predicates
+
+The library keeps **one semantic model** of keyset pagination and varies only the **SQL emission** by sort class and dialect capability.
+
+| Situation                                                                | Emitted shape (DESC example)                                                          |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| Default leading sorts (nullable) or explicit `nulls:`                    | Null-safe OR: `(created_at IS NOT NULL AND created_at < $1) OR (… = $1 AND id …)`     |
+| All non-final sorts set `nullable: false`, uniform dir                   | **Plain OR** on all engines: `created_at < $1 OR (created_at = $1 AND id < $2)`       |
+| Same + dialect supports row compare (Postgres, SQLite, MySQL by default) | **Row compare**: `(created_at, id) < ($1, $2)` — often an Index Cond seek on Postgres |
+| Mixed sort directions                                                    | Plain OR only (row compare is not equivalent)                                         |
+| MSSQL                                                                    | Never row compare (no portable tuple `<` / `>`)                                       |
+
+**Defaults stay null-safe.** Mark non-null feed columns with `nullable: false` when you want the seek-friendly path. That flag is a **runtime assertion** (not inferred from TypeScript types); if the column can actually contain NULLs, pages can be wrong.
+
+Optional `keysetStrategy` on the paginator:
+
+| Value            | Behavior                                                                 |
+| ---------------- | ------------------------------------------------------------------------ |
+| `auto` (default) | Prefer row compare when class + dialect allow; else plain OR / null-safe |
+| `portable`       | Never emit row compare                                                   |
+| `seek`           | Prefer row compare when allowed; same fallbacks as `auto` (no error)     |
+
+```ts
+const paginator = createPaginator({
+  dialect: new PostgresPaginationDialect(),
+  keysetStrategy: 'portable', // force plain OR even on Postgres
+})
+```
+
+See `bench/` for latency/plan comparisons across dialects.
 
 ### Dialects
 
@@ -231,6 +265,7 @@ import { createPaginator, type PaginatorOptions, type Paginator } from 'kysely-c
 const paginator: Paginator = createPaginator({
   dialect, // PaginationDialect
   cursorCodec, // optional: Codec<any, string>; defaults to SuperJSON+Base64URL
+  keysetStrategy, // optional: 'auto' | 'portable' | 'seek'; defaults to 'auto'
 })
 ```
 

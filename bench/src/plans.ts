@@ -5,11 +5,7 @@ import type { DialectHandle } from './types.js'
  * Capture EXPLAIN output for library-shaped cursor SQL, ideal row-comparison
  * keyset, and OFFSET at a deep page. Postgres only (DialectHandle.explain).
  */
-export const captureDeepPlans = async (
-  handle: DialectHandle,
-  pageSize: number,
-  depth: number,
-): Promise<string[]> => {
+export const captureDeepPlans = async (handle: DialectHandle, pageSize: number, depth: number): Promise<string[]> => {
   if (!handle.explain || depth <= 0) return []
 
   const boundaryQ = handle.db
@@ -25,7 +21,8 @@ export const captureDeepPlans = async (
   const createdAtLiteral = toPgTimestamptz(boundary.created_at)
   const plans: string[] = []
 
-  const librarySql = `
+  // Library default for unmarked leading sorts (still available as fallback).
+  const nullSafeSql = `
 SELECT id, author_id, title, body, status, score, created_at
 FROM posts
 WHERE (
@@ -38,7 +35,8 @@ WHERE (
 ORDER BY created_at DESC, id DESC
 LIMIT ${pageSize + 1}`
 
-  const idealSql = `
+  // Library path for feedSorts with nullable: false on Postgres (auto → row_compare).
+  const librarySeekSql = `
 SELECT id, author_id, title, body, status, score, created_at
 FROM posts
 WHERE (created_at, id) < (${createdAtLiteral}, ${boundary.id})
@@ -53,8 +51,8 @@ OFFSET ${offset}
 LIMIT ${pageSize + 1}`
 
   for (const [title, q] of [
-    [`library-shaped keyset (null-safe OR) at depth=${depth}`, librarySql],
-    [`ideal keyset (row comparison) at depth=${depth}`, idealSql],
+    [`library keyset (nullable: false → row compare) at depth=${depth}`, librarySeekSql],
+    [`library keyset (default null-safe OR) at depth=${depth}`, nullSafeSql],
     [`offset at depth=${depth} (OFFSET ${offset})`, offsetSql],
   ] as const) {
     try {
