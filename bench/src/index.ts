@@ -6,7 +6,6 @@ import { DEFAULT_BASELINE_DIR, DEFAULT_BASELINE_JSON, loadBaseline, mergeBaselin
 import { compareBaselines, DEFAULT_REGRESSION_THRESHOLD, hasRegressions, renderCompareMarkdown } from './compare.js'
 import { describeConfig, parseArgs } from './config.js'
 import { renderBaselineMarkdown, renderConsole, writeReports } from './report.js'
-import { runBenchmarks } from './runner.js'
 import type { BaselineReport, BenchReport } from './types.js'
 
 const printHelp = () => {
@@ -161,6 +160,10 @@ const main = async () => {
     await maybeWriteBaseline(current)
     return
   }
+
+  // Lazy-load runner (and thus dialect drivers / kysely-cursor) only for live runs.
+  // --merge / --current must work without a built library dist (CI bench-report job).
+  const { runBenchmarks } = await import('./runner.js')
 
   const cfg = parseArgs(argv)
   console.log('kysely-cursor benchmarks')
