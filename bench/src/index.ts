@@ -5,11 +5,13 @@ import { join, resolve } from 'node:path'
 import { DEFAULT_BASELINE_DIR, DEFAULT_BASELINE_JSON, loadBaseline, mergeBaselines, writeBaseline } from './baseline.js'
 import {
   compareBaselines,
+  deepPageSeries,
   DEFAULT_REGRESSION_THRESHOLD,
   gatingRegressions,
   hasRegressions,
   renderCompareMarkdown,
 } from './compare.js'
+import { writeDeepPageCharts } from './chart.js'
 import { describeConfig, parseArgs } from './config.js'
 import { renderBaselineMarkdown, renderConsole, writeReports } from './report.js'
 import type { BaselineReport, BenchReport } from './types.js'
@@ -222,13 +224,27 @@ const runCompare = async (opts: {
 }) => {
   const baseline = await loadBaseline(opts.baselinePath)
   const result = compareBaselines(baseline, opts.current, opts.threshold)
-  const md = renderCompareMarkdown(result)
+
+  // Chart.js PNG deep-page plots (baseline vs current) next to the comment / results.
+  const { writeFile, mkdir } = await import('node:fs/promises')
+  const { dirname, join } = await import('node:path')
+  const chartDir = opts.commentOut ? join(dirname(opts.commentOut), 'charts') : join(process.cwd(), 'results', 'charts')
+  const dialects = [...new Set(result.matched.map((m) => m.dialect))].sort()
+  const deepCharts = dialects
+    .map((dialect) => ({ dialect, points: deepPageSeries(result.matched, dialect) }))
+    .filter((c) => c.points.length > 0)
+  if (deepCharts.length) {
+    await writeDeepPageCharts(deepCharts, chartDir)
+    console.log(`Deep-page charts written: ${chartDir}`)
+  }
+
+  // Relative `charts/` works for local preview; CI rewrites to raw.githubusercontent.com.
+  const chartUrlBase = process.env.BENCH_CHART_URL_BASE?.replace(/\/$/, '') || 'charts'
+  const md = renderCompareMarkdown(result, { chartUrlBase })
 
   process.stdout.write(`\n${md}\n`)
 
   if (opts.commentOut) {
-    const { writeFile, mkdir } = await import('node:fs/promises')
-    const { dirname } = await import('node:path')
     await mkdir(dirname(opts.commentOut), { recursive: true })
     await writeFile(opts.commentOut, md, 'utf8')
     console.log(`Compare comment written: ${opts.commentOut}`)

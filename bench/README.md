@@ -269,7 +269,8 @@ Benchmarks run as a **dialect matrix** in `.github/workflows/ci.yml`
    deep/walk cells) when the baseline was produced on CI (`gitSha` set).
 2. **Bench report** downloads all dialect artifacts, merges them with
    `--merge bench/artifacts`, and:
-   - On **pull_request**: posts a sticky PR comment with the combined compare report.
+   - On **pull_request**: posts a sticky PR comment with the combined compare report
+     (per-dialect **Chart.js PNG** deep-page curves + sequential-walk table).
    - On **push to main** (only if every matrix leg succeeded): writes
      `bench/baseline/*` and commits `chore(bench): update baseline [skip ci]`.
 
