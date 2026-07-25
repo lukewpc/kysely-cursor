@@ -1,105 +1,88 @@
-import { Generated, Kysely, PostgresDialect, sql } from 'kysely'
-import { Pool } from 'pg'
-import { createPaginator, PostgresPaginationDialect } from 'kysely-cursor'
+/**
+ * kysely-cursor — PostgreSQL example
+ *
+ * Walks through the main library features against a small `posts` table:
+ *   1. Forward / back keyset pagination
+ *   2. Filtered feeds (same sorts, different query)
+ *   3. Nullable sorts with `nulls: 'last'`
+ *   4. `paginateWithEdges` (connection-style)
+ *   5. Offset fallback
+ *   6. Walking an entire result set
+ *
+ * Database lifecycle is owned by package scripts (Docker Compose), not this file:
+ *   pnpm start     # db:up + run demos (preferred)
+ *   pnpm db:up     # start Postgres only
+ *   pnpm db:down   # stop Postgres
+ *   pnpm dev       # demos only (DB must already be up, or set DATABASE_URL)
+ *
+ * From repo root: pnpm example:postgres
+ */
 
-type User = {
-  id: Generated<number>
-  name: string
-  created_at: Date
-}
+import { createDb, destroy, migrate, seed } from './db.js'
+import {
+  demoFilteredFeed,
+  demoForwardAndBack,
+  demoNullablePublishedAt,
+  demoOffsetFallback,
+  demoWalkAll,
+  demoWithEdges,
+} from './demos.js'
+import { createAppPaginator } from './paginator.js'
 
-type DB = {
-  users: User
-}
+/** Matches docker-compose.yml (host port 54329 → container 5432). */
+export const DEFAULT_DATABASE_URL = 'postgres://postgres:postgres@localhost:54329/kysely_cursor_example'
 
 async function main() {
-  const connectionString = process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5432/postgres'
+  const connectionString = process.env.DATABASE_URL ?? DEFAULT_DATABASE_URL
 
-  const db = new Kysely<DB>({
-    dialect: new PostgresDialect({
-      pool: new Pool({ connectionString }),
-    }),
-  })
+  console.log('kysely-cursor · PostgreSQL example')
+  console.log(`connecting: ${connectionString.replace(/:[^:@/]+@/, ':***@')}`)
+
+  const db = createDb(connectionString)
 
   try {
-    await db.schema
-      .createTable('users')
-      .ifNotExists()
-      .addColumn('id', 'serial', (col) => col.primaryKey())
-      .addColumn('name', 'text')
-      .addColumn('created_at', 'timestamp', (col) =>
-        col.notNull().defaultTo(sql`now
-      ()`),
-      )
-      .execute()
+    await migrate(db)
+    await seed(db)
 
-    const countRow = await db
-      .selectFrom('users')
-      .select(sql`count(0)::int`.as('count'))
-      .executeTakeFirst()
-    const rowCount = (countRow?.count ?? 0) as number
-
-    if (rowCount < 10) {
-      const now = Date.now()
-      const rows = Array.from({ length: 12 }, (_, i) => ({
-        name: `User ${String(i + 1).padStart(2, '0')}`,
-        created_at: new Date(now - i * 60 * 60 * 1000), // 1h apart
-      }))
-      await db.insertInto('users').values(rows).execute()
-    }
-
-    const paginator = createPaginator({ dialect: new PostgresPaginationDialect() })
-
-    const sorts = [
-      { col: 'created_at', dir: 'desc' },
-      { col: 'id', dir: 'desc' }, // final non-nullable sort for deterministic ordering
-    ] as const
-    const limit = 5
-
-    const query = db.selectFrom('users').select(['id', 'name', 'created_at'])
-
-    // Page 1
-    const page1 = await paginator.paginate({
-      query,
-      sorts,
-      limit,
+    // Optional: set PAGINATION_SECRET to encrypt page tokens (AES-GCM).
+    const paginator = createAppPaginator({
+      secret: process.env.PAGINATION_SECRET,
     })
-    console.log('\nPage 1:')
-    console.table(page1.items.map((r) => ({ id: r.id, name: r.name, created_at: r.created_at })))
-    console.log('nextPage:', page1.nextPage ? `${page1.nextPage.slice(0, 24)}…` : undefined)
 
-    // Page 2 (forward)
-    if (page1.nextPage) {
-      const page2 = await paginator.paginate({
-        query,
-        sorts,
-        limit,
-        cursor: { nextPage: page1.nextPage },
-      })
-      console.log('\nPage 2 (forward):')
-      console.table(page2.items.map((r) => ({ id: r.id, name: r.name, created_at: r.created_at })))
-      console.log('prevPage:', page2.prevPage ? `${page2.prevPage.slice(0, 24)}…` : undefined)
-
-      // Back to Page 1 (backward)
-      if (page2.prevPage) {
-        const backTo1 = await paginator.paginate({
-          query,
-          sorts,
-          limit,
-          cursor: { prevPage: page2.prevPage },
-        })
-        console.log('\nBack to Page 1 (backward):')
-        console.table(backTo1.items.map((r) => ({ id: r.id, name: r.name, created_at: r.created_at })))
-      }
+    if (process.env.PAGINATION_SECRET) {
+      console.log('cursor codec: SuperJSON → AES-GCM → Base64URL (PAGINATION_SECRET set)')
+    } else {
+      console.log('cursor codec: SuperJSON → Base64URL (library default)')
+      console.log('tip: export PAGINATION_SECRET=… to demo encrypted tokens')
     }
+
+    await demoForwardAndBack(db, paginator)
+    await demoFilteredFeed(db, paginator)
+    await demoNullablePublishedAt(db, paginator)
+    await demoWithEdges(db, paginator)
+    await demoOffsetFallback(db, paginator)
+    await demoWalkAll(db, paginator)
+
+    console.log('\n' + '─'.repeat(72))
+    console.log(' Done. See README.md in this folder for what each demo shows.')
+    console.log('─'.repeat(72) + '\n')
   } finally {
-    await db.destroy()
+    await destroy(db)
   }
 }
 
 try {
   await main()
 } catch (err) {
-  console.error(err)
+  console.error('\nExample failed:', err)
+  console.error(`
+Is the example Postgres up?
+
+  pnpm start      # from examples/postgres — starts Compose DB + runs demos
+  pnpm db:up      # start DB only, then pnpm dev
+  pnpm db:down    # stop when finished
+
+Or set DATABASE_URL to any reachable Postgres instance.
+`)
   process.exitCode = 1
 }

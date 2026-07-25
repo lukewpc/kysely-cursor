@@ -152,7 +152,7 @@ importers:
   examples/postgres:
     dependencies:
       kysely:
-        specifier: ^0.28.7
+        specifier: ^0.28.8
         version: 0.28.8
       kysely-cursor:
         specifier: workspace:*
@@ -161,6 +161,12 @@ importers:
         specifier: ^8.11.5
         version: 8.16.3
     devDependencies:
+      '@types/node':
+        specifier: ^24.7.1
+        version: 24.8.1
+      '@types/pg':
+        specifier: ^8.15.5
+        version: 8.20.0
       tsx:
         specifier: ^4.19.2
         version: 4.20.6
@@ -4222,13 +4228,13 @@ snapshots:
 
   '@types/docker-modem@3.0.6':
     dependencies:
-      '@types/node': 24.8.1
+      '@types/node': 26.1.1
       '@types/ssh2': 1.15.5
 
   '@types/dockerode@3.3.44':
     dependencies:
       '@types/docker-modem': 3.0.6
-      '@types/node': 24.8.1
+      '@types/node': 26.1.1
       '@types/ssh2': 1.15.5
 
   '@types/dockerode@4.0.1':
@@ -4264,20 +4270,20 @@ snapshots:
   '@types/pg@8.20.0':
     dependencies:
       '@types/node': 26.1.1
-      pg-protocol: 1.10.3
+      pg-protocol: 1.15.0
       pg-types: 2.2.0
 
   '@types/readable-stream@4.0.21':
     dependencies:
-      '@types/node': 24.8.1
+      '@types/node': 26.1.1
 
   '@types/ssh2-streams@0.1.12':
     dependencies:
-      '@types/node': 24.8.1
+      '@types/node': 26.1.1
 
   '@types/ssh2@0.5.52':
     dependencies:
-      '@types/node': 24.8.1
+      '@types/node': 26.1.1
       '@types/ssh2-streams': 0.1.12
 
   '@types/ssh2@1.15.5':
@@ -6093,7 +6099,7 @@ snapshots:
       '@protobufjs/path': 1.1.2
       '@protobufjs/pool': 1.1.0
       '@protobufjs/utf8': 1.1.0
-      '@types/node': 24.8.1
+      '@types/node': 26.1.1
       long: 5.3.2
 
   pump@3.0.3:

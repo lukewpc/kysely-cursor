@@ -38,7 +38,7 @@
     "changeset": "changeset",
     "changeset:version": "changeset version",
     "changeset:publish": "changeset publish",
-    "example:postgres": "pnpm --filter kysely-cursor-example-postgres dev",
+    "example:postgres": "pnpm --filter kysely-cursor-example-postgres start",
     "bench": "pnpm --filter kysely-cursor-bench bench",
     "bench:quick": "pnpm --filter kysely-cursor-bench bench:quick",
     "bench:ci": "pnpm --filter kysely-cursor-bench bench:ci",
