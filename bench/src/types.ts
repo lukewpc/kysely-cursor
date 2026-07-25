@@ -1,7 +1,9 @@
 import type { Generated, Kysely, Selectable } from 'kysely'
 import type { PaginationDialect, Paginator } from 'kysely-cursor'
 
-import type { DialectName } from './config.js'
+import type { DialectName, ScenarioId } from './config.js'
+
+export type { ScenarioId } from './config.js'
 
 /** Realistic feed / listing table used by every dialect. */
 export interface PostsTable {
@@ -20,9 +22,6 @@ export interface BenchDB {
 }
 
 export type Post = Selectable<PostsTable>
-
-export type ScenarioId =
-  'deep-page' | 'sequential-walk' | 'filtered-feed' | 'author-timeline' | 'scoreboard' | 'ideal-baseline'
 
 export type Strategy = 'cursor' | 'offset'
 
@@ -83,6 +82,8 @@ export type BenchReportConfig = {
   iterations: number
   warmup: number
   dialects: DialectName[]
+  /** Scenarios included in this run (omitted on older baselines). */
+  scenarios?: ScenarioId[]
 }
 
 export type BenchReport = {

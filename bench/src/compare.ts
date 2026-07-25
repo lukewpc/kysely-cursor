@@ -1,17 +1,16 @@
 import type { BaselineCell, BaselineReport, CellDelta, CompareResult } from './types.js'
 import { cellKey } from './baseline.js'
+import { DEFAULT_REGRESSION_THRESHOLD, isGatingRegression, MIN_ABS_MS, MIN_GATE_DEPTH } from './gate.js'
 import { formatMs, formatSpeedup } from './metrics.js'
 
-export const DEFAULT_REGRESSION_THRESHOLD = 1.5
-
-/**
- * Shallow depths and sub-ms cells are dominated by runner noise on GHA.
- * Only enforce fail-on-regression for library pages at this depth and deeper.
- */
-export const MIN_GATE_DEPTH = 100
-
-/** Raw SQL ceiling — informative, not a library regression signal. */
-const NON_GATING_SCENARIOS = new Set(['ideal-baseline'])
+export {
+  cursorDeltaMs,
+  DEFAULT_REGRESSION_THRESHOLD,
+  GATING_SCENARIOS,
+  isGatingRegression,
+  MIN_ABS_MS,
+  MIN_GATE_DEPTH,
+} from './gate.js'
 
 const safeRatio = (current: number, baseline: number): number => {
   if (!Number.isFinite(current) || !Number.isFinite(baseline) || baseline <= 0) {
@@ -27,28 +26,9 @@ const statusFor = (cursorRatio: number, threshold: number): CellDelta['status'] 
   return 'stable'
 }
 
-/**
- * Whether a cell regression should fail CI (`--fail-on-regression`).
- * Still listed in the report when true or false; only gating ones set exit 1.
- */
-export const isGatingRegression = (d: CellDelta): boolean => {
-  if (d.status !== 'regression') return false
-  if (NON_GATING_SCENARIOS.has(d.scenario)) return false
-
-  const depthMatch = /^depth=(\d+)$/.exec(d.label)
-  if (depthMatch) {
-    return Number(depthMatch[1]) >= MIN_GATE_DEPTH
-  }
-
-  // sequential-walk / author walk labels (`walk=N`) — gate these.
-  if (d.label.startsWith('walk=')) return true
-
-  return true
-}
-
 export const gatingRegressions = (result: CompareResult): CellDelta[] => result.regressions.filter(isGatingRegression)
 
-/** Shape fields that must match for ratios to be meaningful (dialect list excluded). */
+/** Shape fields that must match for ratios to be meaningful (dialect / scenario lists excluded). */
 export const configShapeKey = (
   c: Pick<BaselineReport['config'], 'rowCount' | 'pageSize' | 'deepPageDepths' | 'walkPages' | 'iterations' | 'warmup'>,
 ): string =>
@@ -165,7 +145,7 @@ export const renderCompareMarkdown = (result: CompareResult): string => {
   }
 
   if (noise.length) {
-    lines.push(`### Noisy (not gated)${noise.length > 5 ? ` · ${noise.length}` : ''}`)
+    lines.push(`### Noisy / weak (not gated)${noise.length > 5 ? ` · ${noise.length}` : ''}`)
     lines.push('')
     lines.push(DELTA_HEADER)
     for (const d of noise.slice(0, 5)) lines.push(deltaRow(d))
@@ -218,7 +198,7 @@ export const renderCompareMarkdown = (result: CompareResult): string => {
   }
 
   lines.push(
-    `_Gate: library · depth ≥ ${MIN_GATE_DEPTH} or walk · cursor mean ≥ ${threshold}× · [bench/README.md](bench/README.md)_`,
+    `_Gate: deep-page / sequential-walk · depth ≥ ${MIN_GATE_DEPTH} or walk · ≥ ${threshold}× · Δ ≥ ${MIN_ABS_MS.postgres}ms (sqlite ${MIN_ABS_MS.sqlite}ms) · [bench/README.md](bench/README.md)_`,
   )
   lines.push('')
 

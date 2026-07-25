@@ -10,8 +10,9 @@ export default defineConfig({
     hookTimeout: 20_000,
     testTimeout: 20_000,
     coverage: {
+      // Library sources only — bench suite is auxiliary tooling.
       include: ['src/**/*.ts'],
-      exclude: ['node_modules', 'dist'],
+      exclude: ['node_modules', 'dist', 'bench/**', 'test/**', 'examples/**'],
       reporter: ['text', 'json', 'html'],
       all: true,
       thresholds: {

@@ -1,4 +1,4 @@
-import type { ScenarioContext, ScenarioResult } from '../types.js'
+import type { ScenarioContext, ScenarioId, ScenarioResult } from '../types.js'
 import { runAuthorTimeline } from './author-timeline.js'
 import { runDeepPage } from './deep-page.js'
 import { runFilteredFeed } from './filtered-feed.js'
@@ -6,26 +6,26 @@ import { runIdealBaseline } from './ideal-baseline.js'
 import { runScoreboard } from './scoreboard.js'
 import { runSequentialWalk } from './sequential-walk.js'
 
-export const runAllScenarios = async (ctx: ScenarioContext): Promise<ScenarioResult[]> => {
+type Runner = (ctx: ScenarioContext) => Promise<ScenarioResult>
+
+const RUNNERS: Record<ScenarioId, Runner> = {
+  'deep-page': runDeepPage,
+  'sequential-walk': runSequentialWalk,
+  'filtered-feed': runFilteredFeed,
+  'author-timeline': runAuthorTimeline,
+  scoreboard: runScoreboard,
+  'ideal-baseline': runIdealBaseline,
+}
+
+export const runScenarios = async (ctx: ScenarioContext, scenarios: ScenarioId[]): Promise<ScenarioResult[]> => {
   const results: ScenarioResult[] = []
 
-  process.stdout.write('  scenario: deep-page\n')
-  results.push(await runDeepPage(ctx))
-
-  process.stdout.write('  scenario: sequential-walk\n')
-  results.push(await runSequentialWalk(ctx))
-
-  process.stdout.write('  scenario: filtered-feed\n')
-  results.push(await runFilteredFeed(ctx))
-
-  process.stdout.write('  scenario: author-timeline\n')
-  results.push(await runAuthorTimeline(ctx))
-
-  process.stdout.write('  scenario: scoreboard\n')
-  results.push(await runScoreboard(ctx))
-
-  process.stdout.write('  scenario: ideal-baseline\n')
-  results.push(await runIdealBaseline(ctx))
+  for (const id of scenarios) {
+    const run = RUNNERS[id]
+    if (!run) throw new Error(`No runner registered for scenario "${id}"`)
+    process.stdout.write(`  scenario: ${id}\n`)
+    results.push(await run(ctx))
+  }
 
   return results
 }

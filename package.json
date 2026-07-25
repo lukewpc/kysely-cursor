@@ -41,6 +41,7 @@
     "example:postgres": "pnpm --filter kysely-cursor-example-postgres start",
     "bench": "pnpm --filter kysely-cursor-bench bench",
     "bench:quick": "pnpm --filter kysely-cursor-bench bench:quick",
+    "bench:full": "pnpm --filter kysely-cursor-bench bench:full",
     "bench:ci": "pnpm --filter kysely-cursor-bench bench:ci",
     "bench:update-baseline": "pnpm --filter kysely-cursor-bench bench:update-baseline",
     "bench:compare": "pnpm --filter kysely-cursor-bench bench:compare",
