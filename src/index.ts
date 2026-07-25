@@ -22,6 +22,8 @@ export { ErrorCode, PaginationError } from './error.js'
 // paginator
 export { createPaginator, paginate, paginateWithEdges } from './paginator.js'
 export type {
+  DialectMeta,
+  KeysetStrategy,
   PaginateArgs,
   PaginatedResult,
   PaginatedResultWithEdges,

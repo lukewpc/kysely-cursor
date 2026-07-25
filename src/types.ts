@@ -7,7 +7,24 @@ import type { NullsDirection, SortSet } from './sorting.js'
 export type DialectMeta = {
   supportsNullSortDirective: boolean
   defaultNullsSortAsc: NullsDirection
+  /** SQL row-value comparison: (a, b) < ($1, $2) */
+  supportsRowValueCompare: boolean
+  /**
+   * When false, `simple_non_null` sorts stay on the null-safe OR tree instead of
+   * classic plain OR. MySQL's optimizer seeks the null-safe form well but often
+   * walks plain OR / row compare at depth (benches). Defaults to true.
+   */
+  supportsPlainOrKeyset?: boolean
 }
+
+/**
+ * How the library chooses keyset WHERE emission for non-null uniform sorts.
+ *
+ * - `auto` (default): row compare when the dialect supports it and sorts allow;
+ *   otherwise plain multi-column OR. Nullable / null-ordered sorts stay null-safe.
+ * - `portable`: never emit row compare (only null-safe OR / plain OR).
+ */
+export type KeysetStrategy = 'auto' | 'portable'
 
 export type PaginationDialect = {
   meta: DialectMeta
@@ -32,6 +49,7 @@ export type PaginationDialect = {
     query: SelectQueryBuilder<DB, TB, O>,
     sorts: SortSet<DB, TB, O>,
     cursor: DecodedCursorNextPrev,
+    keysetStrategy?: KeysetStrategy,
   ) => SelectQueryBuilder<DB, TB, O>
 }
 
@@ -41,6 +59,11 @@ export type PaginatorOptions = {
    * Defaults to superJson & base64Url
    */
   cursorCodec?: Codec<any, string>
+  /**
+   * Keyset WHERE emission preference. Defaults to `auto`.
+   * See {@link KeysetStrategy}.
+   */
+  keysetStrategy?: KeysetStrategy
 }
 
 export type PaginateArgs<DB, TB extends keyof DB, O, S extends SortSet<DB, TB, O>> = {

@@ -49,6 +49,7 @@ const TestDialect: PaginationDialect = {
   meta: {
     supportsNullSortDirective: true,
     defaultNullsSortAsc: 'last',
+    supportsRowValueCompare: true,
   },
   applyLimit: (builder, limit) => ((builder as any).limit ? (builder as any).limit(limit) : builder),
   applyOffset: (builder) => builder,
@@ -341,11 +342,18 @@ describe('null-aware sorting', () => {
       { col: 'users.created_at', dir: 'asc', nulls: 'last' },
       { col: 'users.id', dir: 'asc' },
     ]
+    const sortsOmitted: SortSet<DB, 'users', UserRow> = [
+      { col: 'users.created_at', dir: 'asc' },
+      { col: 'users.id', dir: 'asc' },
+    ]
 
     const sigFirst = sortSignature(sortsNullsFirst)
     const sigLast = sortSignature(sortsNullsLast)
+    const sigOmitted = sortSignature(sortsOmitted)
 
     expect(sigFirst).not.toEqual(sigLast)
+    expect(sigOmitted).not.toEqual(sigFirst)
+    expect(sigOmitted).not.toEqual(sigLast)
   })
 
   it('builds predicate for a NULL cursor value when nulls come first', () => {

@@ -21,6 +21,7 @@ export const paginate = async <DB, TB extends keyof DB, O, S extends SortSet<DB,
   cursor,
   dialect,
   cursorCodec = DEFAULT_CURSOR_CODEC,
+  keysetStrategy = 'auto',
 }: PaginateArgs<DB, TB, O, S> & PaginatorOptions): Promise<PaginatedResult<O>> => {
   assertLimitSorts(limit, sorts)
 
@@ -39,7 +40,7 @@ export const paginate = async <DB, TB extends keyof DB, O, S extends SortSet<DB,
         if (decodedCursor.payload.sig !== sig)
           throw new PaginationError({ message: 'Page token does not match sort order', code: 'INVALID_TOKEN' })
 
-        q = dialect.applyCursor(q, sortsApplied, decodedCursor)
+        q = dialect.applyCursor(q, sortsApplied, decodedCursor, keysetStrategy)
       }
     }
 

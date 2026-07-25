@@ -132,7 +132,15 @@ export const createTestHelpers = (db: Kysely<TestDB>, config: DatabaseConfig) =>
     await db.deleteFrom('users').where('name', 'in', names).execute()
   }
 
-  return { baseBuilder, deleteRowsByName, fetchAllPlainSorted, insertRow, paginator, page }
+  return {
+    baseBuilder,
+    deleteRowsByName,
+    dialect: config.dialect,
+    fetchAllPlainSorted,
+    insertRow,
+    paginator,
+    page,
+  }
 }
 
 export const resolveNextPageToken = async (items: TestRow[], sorts: SortSet<TestDB, 'users', TestRow>) => {
@@ -742,6 +750,106 @@ export const runSharedTests = (
       seen.push(...res.items)
       token = res.nextPage
     } while (token)
+    expect(seen.map((r) => r.id)).toEqual(expected.map((r) => r.id))
+  })
+
+  // ── keyset predicate optimization (nullable: false → plain OR / row compare) ──
+
+  it('paginates non-null marked uniform sorts equivalently to the default path', async () => {
+    const { baseBuilder, fetchAllPlainSorted, paginator } = createHelpers()
+
+    // Same logical order as the unmarked default; nullable: false opts into the
+    // fast emission path (plain OR / row compare depending on dialect).
+    const sorts: SortSet<TestDB, 'users', TestRow> = [
+      { col: 'users.created_at', dir: 'desc', nullable: false },
+      { col: 'users.id', dir: 'desc' },
+    ]
+    const expected = await fetchAllPlainSorted(sorts)
+    const limit = 4
+
+    const forwardPages: TestRow[][] = []
+    let nextToken: string | undefined
+    let lastPrevToken: string | undefined
+    do {
+      const res = await paginator.paginate({
+        query: baseBuilder(),
+        sorts,
+        limit,
+        cursor: nextToken ? { nextPage: nextToken } : undefined,
+      })
+      forwardPages.push(res.items)
+      nextToken = res.nextPage
+      lastPrevToken = res.prevPage
+    } while (nextToken)
+
+    expect(forwardPages.flat().map((r) => r.id)).toEqual(expected.map((r) => r.id))
+
+    // prev-page uses inverted applied sorts — classifier + strategy must still match
+    const backwardPages: TestRow[][] = []
+    let prevToken = lastPrevToken
+    while (prevToken) {
+      const res = await paginator.paginate({
+        query: baseBuilder(),
+        sorts,
+        limit,
+        cursor: { prevPage: prevToken },
+      })
+      backwardPages.push(res.items)
+      prevToken = res.prevPage
+    }
+    expect(backwardPages.map((p) => p.map((r) => r.id))).toEqual(
+      forwardPages
+        .slice(0, -1)
+        .reverse()
+        .map((p) => p.map((r) => r.id)),
+    )
+  })
+
+  it('paginates non-null marked mixed-direction sorts (never row compare)', async () => {
+    const { fetchAllPlainSorted, page } = createHelpers()
+    const sorts: SortSet<TestDB, 'users', TestRow> = [
+      { col: 'users.created_at', dir: 'desc', nullable: false },
+      { col: 'users.id', dir: 'asc' },
+    ]
+    const expected = await fetchAllPlainSorted(sorts)
+    const seen: TestRow[] = []
+    let token: string | undefined
+    do {
+      const res = await page(3, sorts, token)
+      seen.push(...res.items)
+      token = res.nextPage
+    } while (token)
+    expect(seen.map((r) => r.id)).toEqual(expected.map((r) => r.id))
+  })
+
+  it('honors keysetStrategy portable for non-null marked sorts', async () => {
+    const { baseBuilder, dialect, fetchAllPlainSorted } = createHelpers()
+    const sorts: SortSet<TestDB, 'users', TestRow> = [
+      { col: 'users.created_at', dir: 'asc', nullable: false },
+      { col: 'users.id', dir: 'asc' },
+    ]
+    const expected = await fetchAllPlainSorted(sorts)
+
+    // portable forces plain OR even on dialects that support row compare
+    const portable = createPaginator({
+      dialect,
+      cursorCodec: codecPipe(superJsonCodec, base64UrlCodec),
+      keysetStrategy: 'portable',
+    })
+
+    const seen: TestRow[] = []
+    let token: string | undefined
+    do {
+      const res = await portable.paginate({
+        query: baseBuilder(),
+        sorts,
+        limit: 4,
+        cursor: token ? { nextPage: token } : undefined,
+      })
+      seen.push(...res.items)
+      token = res.nextPage
+    } while (token)
+
     expect(seen.map((r) => r.id)).toEqual(expected.map((r) => r.id))
   })
 
