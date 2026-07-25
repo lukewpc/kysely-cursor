@@ -3,7 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx index.ts"
+    "db:up": "docker compose up -d --wait",
+    "db:down": "docker compose down",
+    "db:reset": "docker compose down -v && docker compose up -d --wait",
+    "dev": "tsx index.ts",
+    "start": "pnpm db:up && pnpm dev",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "kysely": "^0.29.4",
@@ -11,6 +16,8 @@
     "pg": "^8.22.0"
   },
   "devDependencies": {
+    "@types/node": "^26.1.1",
+    "@types/pg": "^8.20.0",
     "tsx": "^4.23.1",
     "typescript": "^7.0.2"
   }

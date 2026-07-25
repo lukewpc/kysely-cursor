@@ -342,6 +342,14 @@ export type PaginatedResultWithEdges<T> = {
 
 ## Examples
 
+Runnable end-to-end walkthrough (Postgres; starts Docker Compose for you):
+
+```bash
+pnpm example:postgres
+```
+
+See [`examples/postgres`](./examples/postgres) for schema, indexes, codecs, filtered feeds, `paginateWithEdges`, offset fallback, and full-result walks. DB lifecycle: `pnpm db:up` / `db:down` / `start` in that folder.
+
 ### Forward/back pagination
 
 ```ts
