@@ -393,16 +393,17 @@ Multi-dialect cursor vs offset suite lives in [`bench/`](./bench) (Testcontainer
 SQLite).
 
 ```bash
-pnpm bench:quick          # smaller dataset
-pnpm bench                # full suite
+pnpm bench:quick          # smoke
+pnpm bench                # CI profile (deep-page + walk)
+pnpm bench -- --full      # all scenarios, dense depths
 pnpm bench:compare        # vs committed bench/baseline/
 pnpm bench:update-baseline
 ```
 
-CI runs each dialect in parallel, posts a sticky PR comparison comment, and fails on CI-gating
-cursor-mean regressions (≥ 1.5× **and** ≥ dialect abs ms floor on deep-page / sequential-walk cells).
-Successful pushes to `main` refresh `bench/baseline/` only when every dialect job is green
-(`[skip ci]` bot commit). Failed / regressed main runs do not overwrite the baseline.
+CI runs each dialect in parallel on the **lean** profile (deep-page + sequential-walk only), posts a
+sticky PR comparison comment, and fails on CI-gating cursor-mean regressions (≥ 1.5× **and** ≥ dialect
+abs ms floor). Successful pushes to `main` refresh `bench/baseline/` only when every dialect job is
+green (`[skip ci]` bot commit). Failed / regressed main runs do not overwrite the baseline.
 
 ---
 

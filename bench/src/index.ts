@@ -26,6 +26,7 @@ Usage:
 
 Run options:
   --dialect <name[,name…]>   postgres | mysql | mssql | sqlite  (default: all)
+  --scenarios <id[,…]|all>   default: deep-page,sequential-walk  (CI); all with --full
   --rows <n>                 rows to seed                       (default: 50000, quick: 10000)
   --page-size <n>            page size                          (default: 25)
   --depths <n,n,…>           deep-page depths (0-based)
@@ -33,7 +34,8 @@ Run options:
   --iterations <n>           timed iterations per measurement
   --warmup <n>               warmup iterations
   --out <dir>                ephemeral results directory        (default: ./bench/results)
-  --quick                    smaller dataset / fewer iterations
+  --quick                    smoke: smaller seed / fewer iters
+  --full                     poster matrix: all scenarios, dense depths
   --update-baseline          write slim results to bench/baseline/ (skipped if compare failed)
   --baseline-dir <dir>       baseline directory                 (default: ./bench/baseline)
   --git-sha <sha>            record SHA into baseline JSON
@@ -47,7 +49,9 @@ Run options:
   --help                     show this help
 
 Examples:
-  pnpm bench --quick
+  pnpm bench                     # CI profile (deep-page + walk, sparse depths)
+  pnpm bench --quick             # faster smoke
+  pnpm bench --full              # all scenarios, dense depths
   pnpm bench --update-baseline
   pnpm bench --dialect postgres,sqlite --compare --fail-on-regression
   pnpm bench --compare --current bench/results/latest-results.json

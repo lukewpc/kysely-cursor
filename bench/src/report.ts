@@ -128,11 +128,12 @@ export const renderBaselineMarkdown = (baseline: BaselineReport, full?: BenchRep
 
   lines.push('# kysely-cursor benchmarks')
   lines.push('')
+  const scenarioBit = cfg.scenarios?.length ? ` · ${cfg.scenarios.join(',')}` : ''
   lines.push(
     `**${baseline.generatedAt}**${sha} · ` +
       `${cfg.rowCount.toLocaleString()} rows · page ${cfg.pageSize} · ` +
       `iters ${cfg.iterations}/${cfg.warmup} · walk ${cfg.walkPages} · ` +
-      `depths [${cfg.deepPageDepths.join(',')}] · ${cfg.dialects.join(', ')}`,
+      `depths [${cfg.deepPageDepths.join(',')}] · ${cfg.dialects.join(',')}${scenarioBit}`,
   )
   lines.push('')
   lines.push(

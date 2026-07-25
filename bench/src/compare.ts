@@ -28,7 +28,7 @@ const statusFor = (cursorRatio: number, threshold: number): CellDelta['status'] 
 
 export const gatingRegressions = (result: CompareResult): CellDelta[] => result.regressions.filter(isGatingRegression)
 
-/** Shape fields that must match for ratios to be meaningful (dialect list excluded). */
+/** Shape fields that must match for ratios to be meaningful (dialect / scenario lists excluded). */
 export const configShapeKey = (
   c: Pick<BaselineReport['config'], 'rowCount' | 'pageSize' | 'deepPageDepths' | 'walkPages' | 'iterations' | 'warmup'>,
 ): string =>

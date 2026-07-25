@@ -1,7 +1,7 @@
 import type { BenchConfig } from './config.js'
 import { getFactory } from './dialects/index.js'
 import { captureDeepPlans } from './plans.js'
-import { runAllScenarios } from './scenarios/index.js'
+import { runScenarios } from './scenarios/index.js'
 import { countPosts } from './seed.js'
 import type { BenchReport, DialectResult, ScenarioContext } from './types.js'
 
@@ -31,17 +31,22 @@ export const runBenchmarks = async (cfg: BenchConfig): Promise<BenchReport> => {
         totalRows,
       }
 
-      const scenarios = await runAllScenarios(ctx)
+      const scenarios = await runScenarios(ctx, cfg.scenarios)
 
+      // Plans only when deep-page (or any depth sweep) ran — skip ideal-only / walk-only noise.
       const deepest = cfg.deepPageDepths[cfg.deepPageDepths.length - 1] ?? 0
-      process.stdout.write(`  capturing query plans at depth=${deepest}…\n`)
-      const plans = await captureDeepPlans(handle, cfg.pageSize, deepest)
+      let plans: string[] | undefined
+      if (cfg.scenarios.includes('deep-page') || cfg.scenarios.includes('ideal-baseline')) {
+        process.stdout.write(`  capturing query plans at depth=${deepest}…\n`)
+        plans = await captureDeepPlans(handle, cfg.pageSize, deepest)
+        if (!plans.length) plans = undefined
+      }
 
       dialects.push({
         dialect: name,
         rowCount: totalRows,
         scenarios,
-        plans: plans.length ? plans : undefined,
+        plans,
       })
     } finally {
       process.stdout.write(`  disposing ${name}…\n`)
@@ -59,6 +64,7 @@ export const runBenchmarks = async (cfg: BenchConfig): Promise<BenchReport> => {
       iterations: cfg.iterations,
       warmup: cfg.warmup,
       dialects: cfg.dialects,
+      scenarios: cfg.scenarios,
     },
     dialects,
   }
