@@ -36,6 +36,7 @@ Cursor‑based (keyset) pagination utilities for [Kysely](https://github.com/kys
     - [Forward/back pagination](#forwardback-pagination)
     - [Offset fallback](#offset-fallback)
     - [Custom codec pipelines](#custom-codec-pipelines)
+  - [Benchmarks](#benchmarks)
   - [Error Handling](#error-handling)
   - [FAQ](#faq)
     - [Acknowledgements](#acknowledgements)
@@ -385,6 +386,24 @@ const stash = {
 const cursorCodec = stashCodec(stash)
 // Returned tokens look like random UUIDs; payload is stored in Redis.
 ```
+
+---
+
+## Benchmarks
+
+Multi-dialect cursor vs offset suite lives in [`bench/`](./bench) (Testcontainers for Postgres / MySQL / MSSQL; local
+SQLite).
+
+```bash
+pnpm bench:quick          # smaller dataset
+pnpm bench                # full suite
+pnpm bench:compare        # vs committed bench/baseline/
+pnpm bench:update-baseline
+```
+
+CI runs each dialect in parallel, posts a sticky PR comparison comment, and fails on cursor-mean regressions
+(≥ 1.5× baseline). Successful pushes to `main` refresh `bench/baseline/` only when every dialect job is green
+(`[skip ci]` bot commit). Failed / regressed main runs do not overwrite the baseline.
 
 ---
 
