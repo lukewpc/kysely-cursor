@@ -26,12 +26,32 @@ const statusFor = (
   return 'stable'
 }
 
+/** Shape fields that must match for ratios to be meaningful (dialect list excluded). */
+export const configShapeKey = (
+  c: Pick<
+    BaselineReport['config'],
+    'rowCount' | 'pageSize' | 'deepPageDepths' | 'walkPages' | 'iterations' | 'warmup'
+  >,
+): string =>
+  JSON.stringify({
+    rowCount: c.rowCount,
+    pageSize: c.pageSize,
+    deepPageDepths: c.deepPageDepths,
+    walkPages: c.walkPages,
+    iterations: c.iterations,
+    warmup: c.warmup,
+  })
+
 export const compareBaselines = (
   baseline: BaselineReport,
   current: BaselineReport,
   threshold: number = DEFAULT_REGRESSION_THRESHOLD,
 ): CompareResult => {
-  const baseMap = new Map(baseline.cells.map((c) => [cellKey(c), c]))
+  // Partial runs (e.g. CI matrix per dialect) only need baseline cells for dialects present.
+  const currentDialects = new Set(current.cells.map((c) => c.dialect))
+  const scopedBaselineCells = baseline.cells.filter((c) => currentDialects.has(c.dialect))
+
+  const baseMap = new Map(scopedBaselineCells.map((c) => [cellKey(c), c]))
   const curMap = new Map(current.cells.map((c) => [cellKey(c), c]))
 
   const matched: CellDelta[] = []
@@ -111,8 +131,9 @@ export const renderCompareMarkdown = (result: CompareResult): string => {
     result
 
   const hasFail = regressions.length > 0
+  // Dialect list may be a subset (matrix jobs); only shape fields gate ratio meaning.
   const configMismatch =
-    JSON.stringify(baseline.config) !== JSON.stringify(current.config)
+    configShapeKey(baseline.config) !== configShapeKey(current.config)
 
   lines.push(`# Benchmark comparison`)
   lines.push('')

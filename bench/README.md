@@ -217,8 +217,9 @@ offset (engine behavior we do not control).
 
 | Flag | Meaning |
 | --- | --- |
-| `--compare` | Diff current run (or `--current`) against baseline |
+| `--compare` | Diff current run (or `--current` / `--merge`) against baseline |
 | `--current <path>` | Compare-only mode; skip running benches |
+| `--merge <path[,…]>` | Merge partial baseline JSON files or dirs (CI matrix); skips run |
 | `--baseline <path>` | Baseline JSON (default `bench/baseline/results.json`) |
 | `--threshold <n>` | Cursor-mean ratio that counts as a regression |
 | `--fail-on-regression` | Exit 1 when any cell is a regression |
@@ -232,16 +233,29 @@ comparable to Actions runners.
 
 ### CI (every PR + main)
 
-The **Benchmarks** job in `.github/workflows/ci.yml`:
+Benchmarks run as a **dialect matrix** in `.github/workflows/ci.yml`
+(`postgres`, `mysql`, `mssql`, `sqlite` in parallel):
 
-1. Builds the library and runs the **full** suite (same config as the baseline).
-2. Diffs against `bench/baseline/results.json`.
-3. On **pull_request**: posts a sticky PR comment with the compare report.
-4. On **push to main**: commits an updated `bench/baseline/*` with
-   `chore(bench): update baseline [skip ci]` so each main commit has a snapshot.
-5. Fails the job when a CI-produced baseline shows cursor-mean regressions ≥ 1.5×.
+1. Each **Bench (dialect)** job builds the library, runs that dialect only
+   (same seed/page/depth config as the committed baseline), and diffs its cells
+   against `bench/baseline/results.json` (compare scopes to dialects present in
+   the current run). The job fails on cursor-mean regressions ≥ 1.5× when the
+   baseline was produced on CI (`gitSha` set).
+2. **Bench report** downloads all dialect artifacts, merges them with
+   `--merge bench/artifacts`, and:
+   - On **pull_request**: posts a sticky PR comment with the combined compare report.
+   - On **push to main** (only if every matrix leg succeeded): writes
+     `bench/baseline/*` and commits `chore(bench): update baseline [skip ci]`.
 
-Artifacts (`bench/results/`, `bench/baseline/`) are uploaded for every run.
+Artifacts: per-dialect `bench-<dialect>` (latest JSON/report) plus `bench-merged`.
+
+Local equivalent of the matrix merge step:
+
+```bash
+pnpm --filter kysely-cursor-bench bench -- \
+  --merge path/to/bench-postgres,path/to/bench-mysql,... \
+  --compare --comment-out results/pr-comment.md
+```
 
 ### Reading the numbers
 

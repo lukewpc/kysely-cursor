@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-import { access } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { access, readdir, stat } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
 
 import {
   DEFAULT_BASELINE_DIR,
   DEFAULT_BASELINE_JSON,
   loadBaseline,
+  mergeBaselines,
   writeBaseline,
 } from './baseline.js'
 import {
@@ -42,8 +43,9 @@ Run options:
   --update-baseline          write slim results to bench/baseline/ (skipped if compare failed)
   --baseline-dir <dir>       baseline directory                 (default: ./bench/baseline)
   --git-sha <sha>            record SHA into baseline JSON
-  --compare                  after run (or with --current), diff vs baseline
+  --compare                  after run (or with --current/--merge), diff vs baseline
   --current <path>           JSON to treat as current (implies --compare; skips run; can pair with --update-baseline)
+  --merge <path[,path…]>     merge partial baseline JSON files or dirs (CI matrix); implies --compare; skips run
   --baseline <path>          baseline JSON path                 (default: bench/baseline/results.json)
   --threshold <n>            cursor-mean regression ratio       (default: 1.5)
   --fail-on-regression       exit 1 if any cell ≥ threshold
@@ -55,6 +57,7 @@ Examples:
   pnpm bench --update-baseline
   pnpm bench --dialect postgres,sqlite --compare --fail-on-regression
   pnpm bench --compare --current bench/results/latest-results.json
+  pnpm bench --merge artifacts/bench-postgres,artifacts/bench-mysql --update-baseline
 `.trim(),
   )
 }
@@ -76,6 +79,40 @@ const fileExists = async (path: string): Promise<boolean> => {
   }
 }
 
+/** Collect baseline JSON paths from files and directories (recursive for dirs). */
+const collectMergePaths = async (spec: string): Promise<string[]> => {
+  const parts = spec
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  const files: string[] = []
+
+  const walk = async (p: string): Promise<void> => {
+    const abs = resolve(p)
+    const st = await stat(abs)
+    if (st.isFile()) {
+      if (abs.endsWith('.json')) files.push(abs)
+      return
+    }
+    if (!st.isDirectory()) return
+    const entries = await readdir(abs, { withFileTypes: true })
+    for (const e of entries) {
+      const child = join(abs, e.name)
+      if (e.isDirectory()) await walk(child)
+      else if (e.isFile() && e.name.endsWith('.json') && e.name.includes('results')) {
+        files.push(child)
+      }
+    }
+  }
+
+  for (const part of parts) await walk(part)
+  // Prefer latest-results.json when both stamped and latest exist under same dir.
+  const preferred = files.filter((f) => f.endsWith('latest-results.json'))
+  const rest = files.filter((f) => !f.endsWith('latest-results.json'))
+  // If any latest-* found, use only those (one per dialect job); else use all.
+  return preferred.length > 0 ? preferred : rest
+}
+
 const main = async () => {
   const argv = process.argv.slice(2)
   if (hasFlag(argv, '--help') || hasFlag(argv, '-h')) {
@@ -83,8 +120,10 @@ const main = async () => {
     return
   }
 
-  const compareMode = hasFlag(argv, '--compare') || getFlag(argv, '--current') !== undefined
   const currentPath = getFlag(argv, '--current')
+  const mergeSpec = getFlag(argv, '--merge')
+  const compareMode =
+    hasFlag(argv, '--compare') || currentPath !== undefined || mergeSpec !== undefined
   const baselinePath =
     getFlag(argv, '--baseline') ?? resolve(DEFAULT_BASELINE_JSON)
   const baselineDir = getFlag(argv, '--baseline-dir') ?? DEFAULT_BASELINE_DIR
@@ -109,9 +148,21 @@ const main = async () => {
     console.log(`  summary:  ${paths.mdPath}`)
   }
 
-  // Compare / promote-from-existing path: no containers / no run.
-  if (currentPath) {
-    let current = await loadBaseline(resolve(currentPath))
+  // Merge partial matrix artifacts (or promote a single --current file).
+  if (currentPath || mergeSpec) {
+    let current: BaselineReport
+    if (mergeSpec) {
+      const paths = await collectMergePaths(mergeSpec)
+      if (paths.length === 0) {
+        throw new Error(`--merge: no *results*.json files under: ${mergeSpec}`)
+      }
+      console.log(`Merging ${paths.length} baseline file(s):`)
+      for (const p of paths) console.log(`  ${p}`)
+      const parts = await Promise.all(paths.map((p) => loadBaseline(p)))
+      current = mergeBaselines(parts)
+    } else {
+      current = await loadBaseline(resolve(currentPath!))
+    }
     if (gitSha) current = { ...current, gitSha }
     if (compareMode) {
       await runCompare({

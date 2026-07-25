@@ -83,23 +83,22 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
-  # Cursor vs offset pagination benches (testcontainers). Commits a slim baseline on
-  # main; on PRs compares against that baseline and posts a sticky comment.
+  # Cursor vs offset pagination benches (testcontainers), one dialect per matrix
+  # leg so containers run in parallel. Each leg compares its dialect against the
+  # committed baseline and fails on regression. A follow-up job merges artifacts
+  # for the sticky PR comment and (on main) the baseline commit.
   bench:
-    name: Benchmarks
+    name: Bench (${{ matrix.dialect }})
     if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]')
     runs-on: ubuntu-latest
-    timeout-minutes: 90
-    permissions:
-      contents: write
-      pull-requests: write
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        dialect: [postgres, mysql, mssql, sqlite]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          # Needed so the baseline-update push can trigger without loops via [skip ci]
-          # and so we can push to the same ref on main.
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -116,30 +115,102 @@ jobs:
       - name: Build library
         run: pnpm run build
 
-      - name: Run benchmarks
-        # Full suite so results match the committed baseline shape/config.
-        # --compare diffs against bench/baseline/results.json.
-        # --fail-on-regression exits 1 when cursor mean ≥ 1.5× baseline.
-        # Continue so we still post the PR comment when noisy; baseline is only
-        # refreshed after a successful run (see steps below).
+      - name: Run benchmarks (${{ matrix.dialect }})
+        # Same shape as the committed baseline for this dialect.
+        # Compare scopes baseline cells to dialects present in the current run.
+        # Continue so artifacts still upload when noisy; the step outcome gates
+        # baseline promotion (via needs.bench.result) and fails the job below.
         id: bench
         continue-on-error: true
         run: >
           pnpm --filter kysely-cursor-bench bench
-          -- --git-sha "${{ github.sha }}"
+          -- --dialect ${{ matrix.dialect }}
+          --git-sha "${{ github.sha }}"
           --compare
           --fail-on-regression
           --threshold 1.5
-          --comment-out results/pr-comment.md
 
       - name: Upload bench artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bench-results
+          name: bench-${{ matrix.dialect }}
+          path: |
+            bench/results/latest-results.json
+            bench/results/latest-report.md
+          if-no-files-found: ignore
+
+      - name: Fail job on regression
+        if: steps.bench.outcome == 'failure'
+        run: |
+          echo "Benchmark step failed for ${{ matrix.dialect }} (regression or runner error). See logs."
+          exit 1
+
+  # Merge matrix results → sticky PR comment; on main, promote baseline only when
+  # every dialect job succeeded.
+  bench-report:
+    name: Bench report
+    if: >
+      always() &&
+      (github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]')) &&
+      needs.bench.result != 'cancelled' &&
+      needs.bench.result != 'skipped'
+    needs: [bench]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Needed so the baseline-update push can use [skip ci] on main.
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download dialect artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: bench-*
+          path: bench/artifacts
+          merge-multiple: false
+
+      - name: Merge, compare, and write PR comment
+        id: merge
+        continue-on-error: true
+        run: |
+          if ! find bench/artifacts -name 'latest-results.json' 2>/dev/null | grep -q .; then
+            echo "No dialect result artifacts — skip merge."
+            exit 0
+          fi
+          mkdir -p bench/results
+          pnpm --filter kysely-cursor-bench bench -- \
+            --merge bench/artifacts \
+            --git-sha "${{ github.sha }}" \
+            --compare \
+            --threshold 1.5 \
+            --comment-out results/pr-comment.md
+
+      - name: Upload merged bench artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-merged
           path: |
             bench/results/
             bench/baseline/
+            bench/artifacts/
           if-no-files-found: ignore
 
       - name: Comment benchmark report on PR
@@ -150,22 +221,26 @@ jobs:
           header: kysely-cursor-bench
           path: bench/results/pr-comment.md
 
-      # Only promote a new baseline when the suite passed (no regression / runner error).
+      # Only promote a new baseline when every matrix dialect job passed.
       # A failing main run must not overwrite the regression threshold with worse numbers.
       - name: Update baseline on main
         if: >
-          steps.bench.outcome == 'success' &&
+          needs.bench.result == 'success' &&
           github.event_name == 'push' &&
           github.ref == 'refs/heads/main'
-        run: >
-          pnpm --filter kysely-cursor-bench bench
-          -- --git-sha "${{ github.sha }}"
-          --current results/latest-results.json
-          --update-baseline
+        run: |
+          if ! find bench/artifacts -name 'latest-results.json' 2>/dev/null | grep -q .; then
+            echo "No dialect result artifacts — skip baseline update."
+            exit 0
+          fi
+          pnpm --filter kysely-cursor-bench bench -- \
+            --merge bench/artifacts \
+            --git-sha "${{ github.sha }}" \
+            --update-baseline
 
       - name: Commit updated baseline on main
         if: >
-          steps.bench.outcome == 'success' &&
+          needs.bench.result == 'success' &&
           github.event_name == 'push' &&
           github.ref == 'refs/heads/main' &&
           hashFiles('bench/baseline/results.json') != ''
@@ -179,9 +254,3 @@ jobs:
           fi
           git commit -m "chore(bench): update baseline [skip ci]"
           git push
-
-      - name: Fail job on regression
-        if: steps.bench.outcome == 'failure'
-        run: |
-          echo "Benchmark step failed (regression or runner error). See logs / PR comment."
-          exit 1

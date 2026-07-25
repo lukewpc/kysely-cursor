@@ -104,3 +104,44 @@ export const writeBaselineFiles = async (
   )
   return { ...paths, baseline }
 }
+
+const DIALECT_ORDER = ['postgres', 'mysql', 'mssql', 'sqlite'] as const
+type DialectName = (typeof DIALECT_ORDER)[number]
+
+/**
+ * Merge partial baseline reports (e.g. one file per CI matrix dialect) into a
+ * single report. Later reports overwrite cells with the same dialect|scenario|label.
+ * Config is taken from the first report; `config.dialects` is the union in
+ * canonical order.
+ */
+export const mergeBaselines = (reports: BaselineReport[]): BaselineReport => {
+  if (reports.length === 0) {
+    throw new Error('mergeBaselines: need at least one report')
+  }
+  if (reports.length === 1) return reports[0]!
+
+  const cellMap = new Map<string, BaselineCell>()
+  const dialectSet = new Set<DialectName>()
+  let generatedAt = reports[0]!.generatedAt
+  let gitSha = reports[0]!.gitSha
+  const baseConfig = { ...reports[0]!.config }
+
+  for (const r of reports) {
+    if (r.generatedAt > generatedAt) generatedAt = r.generatedAt
+    if (r.gitSha) gitSha = r.gitSha
+    for (const c of r.cells) {
+      cellMap.set(cellKey(c), c)
+      dialectSet.add(c.dialect)
+    }
+  }
+
+  const dialects: DialectName[] = DIALECT_ORDER.filter((d) => dialectSet.has(d))
+
+  return {
+    version: 1,
+    generatedAt,
+    gitSha,
+    config: { ...baseConfig, dialects },
+    cells: [...cellMap.values()],
+  }
+}
