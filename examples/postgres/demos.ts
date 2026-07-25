@@ -5,13 +5,13 @@ import type { Database, PostRow } from './db.js'
 
 const PAGE_SIZE = 5
 
-/** Chronological feed — `nullable: false` on non-null keys for simpler keyset SQL. */
+/** Chronological feed — non-null keys unlock Postgres row-compare seeks. */
 export const feedSorts = [
   {
     col: 'posts.created_at' as const,
     dir: 'desc' as const,
     output: 'created_at' as const,
-    /** Assert no NULLs so the library can use a simpler deep-page predicate. */
+    /** Assert no NULLs so the dialect may emit `(created_at, id) < ($1, $2)`. */
     nullable: false as const,
   },
   // Final sort must be unique + non-nullable (tie-breaker). Prefer a primary key.

@@ -23,7 +23,7 @@ export const runAuthorTimeline = async (ctx: ScenarioContext): Promise<ScenarioR
   // ~2% of rows belong to the hot author (every 50th).
   const authorRows = Math.floor(ctx.totalRows / 50)
   const maxDepth = Math.max(0, Math.floor(authorRows / pageSize) - 1)
-  const depths = [0, 5, 10, 25, 50].filter((d) => d <= maxDepth)
+  const depths = [0, 5, 10, 25, 50, 100].filter((d) => d <= maxDepth)
   const walkPages = Math.min(ctx.walkPages, maxDepth + 1)
 
   const { samples, labels } = await runDepthSweep({

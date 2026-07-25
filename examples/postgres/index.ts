@@ -47,6 +47,7 @@ async function main() {
     // Optional: set PAGINATION_SECRET to encrypt page tokens (AES-GCM).
     const paginator = createAppPaginator({
       secret: process.env.PAGINATION_SECRET,
+      keysetStrategy: 'auto',
     })
 
     if (process.env.PAGINATION_SECRET) {

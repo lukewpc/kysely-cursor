@@ -7,10 +7,10 @@
     "noUncheckedSideEffectImports": true,
     "moduleDetection": "force",
     "skipLibCheck": true,
-    "baseUrl": "src",
-    "types": ["vitest/globals"],
+    "rootDir": "./src",
+    "types": ["node"],
     "paths": {
-      "~/*": ["./*"]
+      "~/*": ["./src/*"]
     }
   },
   "include": ["src/**/*.ts"]
