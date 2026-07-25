@@ -22,7 +22,7 @@ await paginator.paginate({ query, sorts, limit, cursor: { offset } })
 
 ## Prerequisites
 
-- Node 24+
+- Node 18+
 - pnpm
 - Docker (for postgres / mysql / mssql)
 
@@ -36,35 +36,42 @@ pnpm build          # build kysely-cursor so the workspace package resolves
 ## Run
 
 ```bash
-# all dialects, 200k rows (needs Docker)
+# all dialects, 50k rows (needs Docker) — CI default shape
 pnpm bench
 
-# fast smoke (20k rows, fewer iterations) — good first run
+# fast smoke (10k rows, fewer iterations) — good first run
 pnpm bench:quick
 
 # single dialect
 pnpm bench:sqlite
 pnpm bench:postgres
 
+# heavier local run (old-style volume)
+pnpm --filter kysely-cursor-bench bench -- \
+  --rows 200000 --depths 0,10,50,100,500,1000,2000,4000 --walk-pages 150 --iterations 12
+
 # fine-grained knobs
 pnpm --filter kysely-cursor-bench bench -- --dialect postgres,sqlite --rows 50000 --depths 0,10,100,500
 ```
 
+Defaults are tuned for **CI wall time** (MySQL/MSSQL containers + deep OFFSET dominate). The curve
+still shows cursor staying flat while offset grows; use the heavier flags above for poster numbers.
+
 ### CLI flags
 
-| Flag                | Default                                                     | Description                                    |
-| ------------------- | ----------------------------------------------------------- | ---------------------------------------------- |
-| `--dialect`         | all                                                         | Comma-separated: `postgres,mysql,mssql,sqlite` |
-| `--rows`            | `200000` (`20000` with `--quick`)                           | Seed size                                      |
-| `--page-size`       | `25`                                                        | Rows per page                                  |
-| `--depths`          | `0,10,50,100,500,1000,2000,4000` (quick: `0,10,50,200,400`) | Deep-page depths (0-based); clipped to dataset |
-| `--walk-pages`      | `150` (`40` with `--quick`)                                 | Sequential-walk length                         |
-| `--iterations`      | `12` (`5` with `--quick`)                                   | Timed iterations per cell                      |
-| `--warmup`          | `3` (`1` with `--quick`)                                    | Untimed warmup iterations                      |
-| `--out`             | `./bench/results`                                           | Ephemeral report output directory              |
-| `--quick`           | off                                                         | Smaller dataset / fewer iterations             |
-| `--compare`         | off                                                         | Diff vs committed baseline after the run       |
-| `--update-baseline` | off                                                         | Write `bench/baseline/` (committed snapshot)   |
+| Flag                | Default                                       | Description                                    |
+| ------------------- | --------------------------------------------- | ---------------------------------------------- |
+| `--dialect`         | all                                           | Comma-separated: `postgres,mysql,mssql,sqlite` |
+| `--rows`            | `50000` (`10000` with `--quick`)              | Seed size                                      |
+| `--page-size`       | `25`                                          | Rows per page                                  |
+| `--depths`          | `0,10,50,100,500,1000` (quick: `0,10,50,200`) | Deep-page depths (0-based); clipped to dataset |
+| `--walk-pages`      | `40` (`15` with `--quick`)                    | Sequential-walk length                         |
+| `--iterations`      | `6` (`3` with `--quick`)                      | Timed iterations per cell                      |
+| `--warmup`          | `2` (`1` with `--quick`)                      | Untimed warmup iterations                      |
+| `--out`             | `./bench/results`                             | Ephemeral report output directory              |
+| `--quick`           | off                                           | Smaller dataset / fewer iterations             |
+| `--compare`         | off                                           | Diff vs committed baseline after the run       |
+| `--update-baseline` | off                                           | Write `bench/baseline/` (committed snapshot)   |
 
 ## Scenarios
 
