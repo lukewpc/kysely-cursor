@@ -1,267 +1,267 @@
 # kysely-cursor benchmarks
 
-**2026-07-25T16:40:14.758Z** · `dabd5d9` · 50,000 rows · page 25 · iters 6/2 · walk 40 · depths [0,10,50,100,500,1000] · postgres, mysql, mssql, sqlite
+**2026-07-25T17:02:02.131Z** · `dd14529` · 50,000 rows · page 25 · iters 6/2 · walk 40 · depths [0,10,50,100,500,1000] · postgres, mysql, mssql, sqlite
 
 Cursor = keyset via library API (`nullable: false` on non-null keys). Offset = built-in offset fallback. Speedup = offset/cursor (higher ⇒ cursor faster).
 
 ## Headline — deepest deep-page
 
-| Dialect  | Label      |  Cursor |  Offset | Speedup |
-| -------- | ---------- | ------: | ------: | ------: |
-| postgres | depth=1000 |  1.04ms |  2.86ms |   2.74× |
-| mysql    | depth=1000 | 0.629ms |  81.1ms |    129× |
-| mssql    | depth=1000 |  12.9ms |  46.2ms |   3.58× |
-| sqlite   | depth=1000 | 0.198ms | 0.753ms |   3.81× |
+| Dialect | Label | Cursor | Offset | Speedup |
+| --- | --- | ---: | ---: | ---: |
+| postgres | depth=1000 | 0.817ms | 2.65ms | 3.25× |
+| mysql | depth=1000 | 0.662ms | 82.9ms | 125× |
+| mssql | depth=1000 | 14.3ms | 51.4ms | 3.59× |
+| sqlite | depth=1000 | 0.176ms | 0.949ms | 5.40× |
 
 ## postgres
 
 ### deep-page
 
-| Label      |  Cursor |  Offset | Speedup |     Δ ms |
-| ---------- | ------: | ------: | ------: | -------: |
-| depth=0    | 0.990ms |  1.00ms |   1.01× |  0.012ms |
-| depth=10   | 0.923ms | 0.786ms |   0.85× | -0.137ms |
-| depth=50   | 0.832ms | 0.979ms |   1.18× |  0.146ms |
-| depth=100  | 0.975ms |  1.19ms |   1.22× |  0.215ms |
-| depth=500  | 0.745ms |  1.74ms |   2.34× |  0.995ms |
-| depth=1000 |  1.04ms |  2.86ms |   2.74× |   1.82ms |
+| Label | Cursor | Offset | Speedup | Δ ms |
+| --- | ---: | ---: | ---: | ---: |
+| depth=0 | 0.776ms | 0.660ms | 0.85× | -0.116ms |
+| depth=10 | 0.711ms | 0.582ms | 0.82× | -0.129ms |
+| depth=50 | 0.658ms | 0.682ms | 1.04× | 0.024ms |
+| depth=100 | 0.870ms | 0.838ms | 0.96× | -0.032ms |
+| depth=500 | 0.687ms | 2.50ms | 3.65× | 1.82ms |
+| depth=1000 | 0.817ms | 2.65ms | 3.25× | 1.83ms |
 
 ### sequential-walk
 
-| Label   | Cursor | Offset | Speedup |     Δ ms |
-| ------- | -----: | -----: | ------: | -------: |
-| walk=40 | 28.8ms | 25.2ms |   0.87× | -3.619ms |
+| Label | Cursor | Offset | Speedup | Δ ms |
+| --- | ---: | ---: | ---: | ---: |
+| walk=40 | 20.1ms | 16.8ms | 0.84× | -3.279ms |
 
 ### filtered-feed
 
-| Label      |  Cursor |  Offset | Speedup |     Δ ms |
-| ---------- | ------: | ------: | ------: | -------: |
-| depth=0    |  1.17ms | 0.637ms |   0.54× | -0.532ms |
-| depth=10   |  1.08ms | 0.877ms |   0.81× | -0.203ms |
-| depth=50   | 0.712ms |  1.26ms |   1.77× |  0.545ms |
-| depth=100  | 0.652ms |  1.06ms |   1.63× |  0.411ms |
-| depth=500  | 0.623ms |  4.96ms |   7.96× |   4.34ms |
-| depth=1000 | 0.582ms |  10.5ms |   18.0× |   9.92ms |
+| Label | Cursor | Offset | Speedup | Δ ms |
+| --- | ---: | ---: | ---: | ---: |
+| depth=0 | 0.415ms | 0.400ms | 0.96× | -0.015ms |
+| depth=10 | 0.854ms | 0.540ms | 0.63× | -0.314ms |
+| depth=50 | 0.595ms | 0.721ms | 1.21× | 0.126ms |
+| depth=100 | 0.749ms | 0.803ms | 1.07× | 0.054ms |
+| depth=500 | 0.453ms | 3.19ms | 7.05× | 2.74ms |
+| depth=1000 | 0.424ms | 5.34ms | 12.6× | 4.92ms |
 
 ### author-timeline
 
-| Label    |  Cursor |  Offset | Speedup |     Δ ms |
-| -------- | ------: | ------: | ------: | -------: |
-| depth=0  | 0.505ms | 0.501ms |   0.99× | -0.004ms |
-| depth=5  | 0.591ms | 0.547ms |   0.92× | -0.044ms |
-| depth=10 | 0.587ms | 0.567ms |   0.97× | -0.020ms |
-| depth=25 | 0.563ms | 0.729ms |   1.30× |  0.167ms |
-| walk=40  |  25.7ms |  32.3ms |   1.26× |   6.66ms |
+| Label | Cursor | Offset | Speedup | Δ ms |
+| --- | ---: | ---: | ---: | ---: |
+| depth=0 | 0.560ms | 0.479ms | 0.85× | -0.081ms |
+| depth=5 | 0.500ms | 0.503ms | 1.00× | 0.002ms |
+| depth=10 | 0.452ms | 0.473ms | 1.05× | 0.021ms |
+| depth=25 | 0.526ms | 0.593ms | 1.13× | 0.067ms |
+| walk=40 | 17.4ms | 25.4ms | 1.46× | 8.01ms |
 
 ### scoreboard
 
-| Label      |  Cursor |  Offset | Speedup |     Δ ms |
-| ---------- | ------: | ------: | ------: | -------: |
-| depth=0    | 0.492ms | 0.862ms |   1.75× |  0.370ms |
-| depth=10   | 0.584ms | 0.545ms |   0.93× | -0.039ms |
-| depth=50   | 0.613ms | 0.873ms |   1.42× |  0.260ms |
-| depth=100  | 0.545ms | 0.932ms |   1.71× |  0.387ms |
-| depth=500  | 0.545ms |  2.77ms |   5.07× |   2.22ms |
-| depth=1000 | 0.664ms |  5.23ms |   7.87× |   4.56ms |
+| Label | Cursor | Offset | Speedup | Δ ms |
+| --- | ---: | ---: | ---: | ---: |
+| depth=0 | 0.330ms | 0.818ms | 2.48× | 0.488ms |
+| depth=10 | 0.591ms | 1.28ms | 2.16× | 0.684ms |
+| depth=50 | 0.392ms | 0.529ms | 1.35× | 0.138ms |
+| depth=100 | 0.429ms | 0.712ms | 1.66× | 0.283ms |
+| depth=500 | 0.384ms | 2.34ms | 6.10× | 1.96ms |
+| depth=1000 | 0.381ms | 4.35ms | 11.4× | 3.97ms |
 
 ### ideal-baseline
 
-| Label      |  Cursor |  Offset | Speedup |    Δ ms |
-| ---------- | ------: | ------: | ------: | ------: |
-| depth=0    | 0.442ms | 0.745ms |   1.69× | 0.303ms |
-| depth=50   | 0.486ms | 0.576ms |   1.19× | 0.090ms |
-| depth=100  | 0.472ms | 0.635ms |   1.34× | 0.162ms |
-| depth=500  | 0.492ms |  1.56ms |   3.17× |  1.06ms |
-| depth=1000 | 0.467ms |  2.69ms |   5.77× |  2.23ms |
+| Label | Cursor | Offset | Speedup | Δ ms |
+| --- | ---: | ---: | ---: | ---: |
+| depth=0 | 0.307ms | 0.300ms | 0.98× | -0.007ms |
+| depth=50 | 0.332ms | 0.391ms | 1.18× | 0.059ms |
+| depth=100 | 0.339ms | 0.473ms | 1.40× | 0.135ms |
+| depth=500 | 0.330ms | 1.26ms | 3.83× | 0.932ms |
+| depth=1000 | 0.412ms | 2.70ms | 6.56× | 2.29ms |
 
 ## mysql
 
 ### deep-page
 
-| Label      |  Cursor |  Offset | Speedup |     Δ ms |
-| ---------- | ------: | ------: | ------: | -------: |
-| depth=0    | 0.932ms | 0.780ms |   0.84× | -0.152ms |
-| depth=10   | 0.997ms |  1.03ms |   1.03× |  0.028ms |
-| depth=50   | 0.841ms |  1.92ms |   2.28× |   1.08ms |
-| depth=100  | 0.959ms |  54.3ms |   56.6× |   53.4ms |
-| depth=500  | 0.707ms |  68.5ms |   96.9× |   67.8ms |
-| depth=1000 | 0.629ms |  81.1ms |    129× |   80.5ms |
+| Label | Cursor | Offset | Speedup | Δ ms |
+| --- | ---: | ---: | ---: | ---: |
+| depth=0 | 0.917ms | 0.802ms | 0.87× | -0.115ms |
+| depth=10 | 1.90ms | 1.21ms | 0.64× | -0.693ms |
+| depth=50 | 0.889ms | 2.04ms | 2.30× | 1.15ms |
+| depth=100 | 0.907ms | 56.2ms | 62.0× | 55.3ms |
+| depth=500 | 0.642ms | 69.4ms | 108× | 68.8ms |
+| depth=1000 | 0.662ms | 82.9ms | 125× | 82.2ms |
 
 ### sequential-walk
 
-| Label   | Cursor | Offset | Speedup |   Δ ms |
-| ------- | -----: | -----: | ------: | -----: |
-| walk=40 | 25.2ms | 39.4ms |   1.56× | 14.2ms |
+| Label | Cursor | Offset | Speedup | Δ ms |
+| --- | ---: | ---: | ---: | ---: |
+| walk=40 | 25.5ms | 39.4ms | 1.55× | 13.9ms |
 
 ### filtered-feed
 
-| Label      |  Cursor |  Offset | Speedup |    Δ ms |
-| ---------- | ------: | ------: | ------: | ------: |
-| depth=0    | 0.532ms | 0.557ms |   1.05× | 0.024ms |
-| depth=10   | 0.659ms | 0.826ms |   1.25× | 0.167ms |
-| depth=50   | 0.667ms |  1.90ms |   2.85× |  1.23ms |
-| depth=100  | 0.662ms |  3.20ms |   4.84× |  2.54ms |
-| depth=500  | 0.651ms |  14.5ms |   22.3× |  13.9ms |
-| depth=1000 | 0.607ms |  31.0ms |   51.0× |  30.4ms |
+| Label | Cursor | Offset | Speedup | Δ ms |
+| --- | ---: | ---: | ---: | ---: |
+| depth=0 | 0.520ms | 0.537ms | 1.03× | 0.017ms |
+| depth=10 | 0.664ms | 1.52ms | 2.28× | 0.852ms |
+| depth=50 | 0.659ms | 1.88ms | 2.86× | 1.22ms |
+| depth=100 | 0.720ms | 3.41ms | 4.74× | 2.69ms |
+| depth=500 | 0.650ms | 14.7ms | 22.7× | 14.1ms |
+| depth=1000 | 0.629ms | 33.3ms | 52.9× | 32.6ms |
 
 ### author-timeline
 
-| Label    |  Cursor |  Offset | Speedup |     Δ ms |
-| -------- | ------: | ------: | ------: | -------: |
-| depth=0  | 0.497ms | 0.483ms |   0.97× | -0.013ms |
-| depth=5  | 0.599ms |  1.37ms |   2.29× |  0.775ms |
-| depth=10 | 0.602ms | 0.768ms |   1.28× |  0.166ms |
-| depth=25 | 0.643ms |  1.21ms |   1.87× |  0.562ms |
-| walk=40  |  24.1ms |  41.5ms |   1.72× |   17.4ms |
+| Label | Cursor | Offset | Speedup | Δ ms |
+| --- | ---: | ---: | ---: | ---: |
+| depth=0 | 0.573ms | 0.524ms | 0.91× | -0.049ms |
+| depth=5 | 0.650ms | 0.672ms | 1.03× | 0.022ms |
+| depth=10 | 0.664ms | 0.794ms | 1.20× | 0.130ms |
+| depth=25 | 0.670ms | 1.20ms | 1.79× | 0.531ms |
+| walk=40 | 25.4ms | 42.9ms | 1.69× | 17.5ms |
 
 ### scoreboard
 
-| Label      |  Cursor |  Offset | Speedup |     Δ ms |
-| ---------- | ------: | ------: | ------: | -------: |
-| depth=0    | 0.465ms | 0.458ms |   0.99× | -0.006ms |
-| depth=10   | 0.578ms | 0.746ms |   1.29× |  0.169ms |
-| depth=50   | 0.592ms |  1.89ms |   3.19× |   1.29ms |
-| depth=100  | 0.570ms |  55.2ms |   96.7× |   54.6ms |
-| depth=500  | 0.585ms |  70.6ms |    121× |   70.0ms |
-| depth=1000 | 0.550ms |  84.3ms |    153× |   83.7ms |
+| Label | Cursor | Offset | Speedup | Δ ms |
+| --- | ---: | ---: | ---: | ---: |
+| depth=0 | 0.448ms | 0.450ms | 1.00× | 0.002ms |
+| depth=10 | 0.598ms | 0.791ms | 1.32× | 0.194ms |
+| depth=50 | 0.573ms | 1.82ms | 3.17× | 1.24ms |
+| depth=100 | 0.592ms | 56.4ms | 95.3× | 55.8ms |
+| depth=500 | 0.565ms | 72.7ms | 129× | 72.2ms |
+| depth=1000 | 0.576ms | 87.4ms | 152× | 86.8ms |
 
 ### ideal-baseline
 
-| Label      |  Cursor |  Offset | Speedup |     Δ ms |
-| ---------- | ------: | ------: | ------: | -------: |
-| depth=0    | 0.399ms | 0.393ms |   0.98× | -0.006ms |
-| depth=50   | 0.510ms |  1.66ms |   3.25× |   1.15ms |
-| depth=100  | 0.484ms |  53.9ms |    111× |   53.4ms |
-| depth=500  | 0.525ms |  68.0ms |    129× |   67.5ms |
-| depth=1000 | 0.517ms |  80.9ms |    157× |   80.3ms |
+| Label | Cursor | Offset | Speedup | Δ ms |
+| --- | ---: | ---: | ---: | ---: |
+| depth=0 | 0.407ms | 0.403ms | 0.99× | -0.004ms |
+| depth=50 | 0.534ms | 1.71ms | 3.21× | 1.18ms |
+| depth=100 | 0.526ms | 56.1ms | 107× | 55.6ms |
+| depth=500 | 0.533ms | 71.3ms | 134× | 70.8ms |
+| depth=1000 | 0.578ms | 83.1ms | 144× | 82.5ms |
 
 ## mssql
 
 ### deep-page
 
-| Label      | Cursor | Offset | Speedup |     Δ ms |
-| ---------- | -----: | -----: | ------: | -------: |
-| depth=0    | 2.22ms | 2.16ms |   0.97× | -0.058ms |
-| depth=10   | 2.40ms | 2.50ms |   1.04× |  0.094ms |
-| depth=50   | 2.39ms | 4.83ms |   2.02× |   2.44ms |
-| depth=100  | 2.77ms | 7.18ms |   2.59× |   4.41ms |
-| depth=500  | 8.25ms | 28.3ms |   3.44× |   20.1ms |
-| depth=1000 | 12.9ms | 46.2ms |   3.58× |   33.3ms |
+| Label | Cursor | Offset | Speedup | Δ ms |
+| --- | ---: | ---: | ---: | ---: |
+| depth=0 | 2.00ms | 1.98ms | 0.99× | -0.013ms |
+| depth=10 | 2.41ms | 2.66ms | 1.10× | 0.250ms |
+| depth=50 | 2.18ms | 4.64ms | 2.13× | 2.46ms |
+| depth=100 | 2.57ms | 7.03ms | 2.73× | 4.46ms |
+| depth=500 | 8.57ms | 30.8ms | 3.59× | 22.2ms |
+| depth=1000 | 14.3ms | 51.4ms | 3.59× | 37.0ms |
 
 ### sequential-walk
 
-| Label   | Cursor | Offset | Speedup |   Δ ms |
-| ------- | -----: | -----: | ------: | -----: |
-| walk=40 | 73.6ms |  101ms |   1.38× | 27.6ms |
+| Label | Cursor | Offset | Speedup | Δ ms |
+| --- | ---: | ---: | ---: | ---: |
+| walk=40 | 66.8ms | 102ms | 1.52× | 35.0ms |
 
 ### filtered-feed
 
-| Label      | Cursor | Offset | Speedup |    Δ ms |
-| ---------- | -----: | -----: | ------: | ------: |
-| depth=0    | 1.41ms | 1.42ms |   1.01× | 0.014ms |
-| depth=10   | 1.62ms | 2.30ms |   1.42× | 0.675ms |
-| depth=50   | 2.09ms | 4.51ms |   2.16× |  2.42ms |
-| depth=100  | 2.66ms | 7.63ms |   2.87× |  4.97ms |
-| depth=500  | 7.23ms | 28.2ms |   3.90× |  20.9ms |
-| depth=1000 | 14.0ms | 49.3ms |   3.53× |  35.3ms |
+| Label | Cursor | Offset | Speedup | Δ ms |
+| --- | ---: | ---: | ---: | ---: |
+| depth=0 | 1.28ms | 1.28ms | 1.00× | -0.001ms |
+| depth=10 | 1.92ms | 1.90ms | 0.99× | -0.028ms |
+| depth=50 | 2.03ms | 4.56ms | 2.25× | 2.53ms |
+| depth=100 | 2.62ms | 8.56ms | 3.27× | 5.95ms |
+| depth=500 | 9.21ms | 32.3ms | 3.51× | 23.1ms |
+| depth=1000 | 16.0ms | 54.1ms | 3.39× | 38.1ms |
 
 ### author-timeline
 
-| Label    | Cursor | Offset | Speedup |     Δ ms |
-| -------- | -----: | -----: | ------: | -------: |
-| depth=0  | 1.49ms | 1.49ms |   1.00× | -0.005ms |
-| depth=5  | 1.53ms | 1.78ms |   1.17× |  0.255ms |
-| depth=10 | 1.82ms | 2.00ms |   1.10× |  0.180ms |
-| depth=25 | 1.99ms | 3.07ms |   1.54× |   1.08ms |
-| walk=40  | 71.8ms |  110ms |   1.53× |   37.7ms |
+| Label | Cursor | Offset | Speedup | Δ ms |
+| --- | ---: | ---: | ---: | ---: |
+| depth=0 | 1.26ms | 1.28ms | 1.02× | 0.023ms |
+| depth=5 | 1.36ms | 2.94ms | 2.16× | 1.58ms |
+| depth=10 | 1.43ms | 1.89ms | 1.33× | 0.464ms |
+| depth=25 | 1.61ms | 2.73ms | 1.70× | 1.13ms |
+| walk=40 | 65.5ms | 109ms | 1.67× | 43.8ms |
 
 ### scoreboard
 
-| Label      | Cursor | Offset | Speedup |    Δ ms |
-| ---------- | -----: | -----: | ------: | ------: |
-| depth=0    | 1.46ms | 1.48ms |   1.02× | 0.023ms |
-| depth=10   | 1.65ms | 2.00ms |   1.21× | 0.347ms |
-| depth=50   | 1.86ms | 4.92ms |   2.64× |  3.06ms |
-| depth=100  | 2.36ms | 7.76ms |   3.29× |  5.40ms |
-| depth=500  | 5.65ms | 29.9ms |   5.29× |  24.2ms |
-| depth=1000 | 9.41ms | 51.3ms |   5.45× |  41.9ms |
+| Label | Cursor | Offset | Speedup | Δ ms |
+| --- | ---: | ---: | ---: | ---: |
+| depth=0 | 1.34ms | 3.21ms | 2.39× | 1.86ms |
+| depth=10 | 1.41ms | 1.83ms | 1.30× | 0.425ms |
+| depth=50 | 2.25ms | 4.16ms | 1.85× | 1.92ms |
+| depth=100 | 2.22ms | 9.99ms | 4.51× | 7.77ms |
+| depth=500 | 5.12ms | 31.1ms | 6.08× | 26.0ms |
+| depth=1000 | 11.8ms | 54.1ms | 4.58× | 42.3ms |
 
 ### ideal-baseline
 
-| Label      | Cursor | Offset | Speedup |    Δ ms |
-| ---------- | -----: | -----: | ------: | ------: |
-| depth=0    | 1.32ms | 1.33ms |   1.01× | 0.007ms |
-| depth=50   | 1.88ms | 4.60ms |   2.44× |  2.71ms |
-| depth=100  | 2.36ms | 7.01ms |   2.96× |  4.64ms |
-| depth=500  | 6.31ms | 27.1ms |   4.30× |  20.8ms |
-| depth=1000 | 12.0ms | 47.1ms |   3.92× |  35.1ms |
+| Label | Cursor | Offset | Speedup | Δ ms |
+| --- | ---: | ---: | ---: | ---: |
+| depth=0 | 1.21ms | 1.22ms | 1.01× | 0.006ms |
+| depth=50 | 1.70ms | 4.15ms | 2.45× | 2.46ms |
+| depth=100 | 2.20ms | 8.80ms | 4.00× | 6.60ms |
+| depth=500 | 7.77ms | 30.8ms | 3.97× | 23.0ms |
+| depth=1000 | 13.4ms | 51.4ms | 3.85× | 38.0ms |
 
 ## sqlite
 
 ### deep-page
 
-| Label      |  Cursor |  Offset | Speedup |     Δ ms |
-| ---------- | ------: | ------: | ------: | -------: |
-| depth=0    | 0.363ms | 0.247ms |   0.68× | -0.116ms |
-| depth=10   | 0.307ms | 0.214ms |   0.70× | -0.092ms |
-| depth=50   | 0.291ms | 0.235ms |   0.81× | -0.055ms |
-| depth=100  | 0.291ms | 0.252ms |   0.86× | -0.040ms |
-| depth=500  | 0.233ms | 0.472ms |   2.03× |  0.239ms |
-| depth=1000 | 0.198ms | 0.753ms |   3.81× |  0.555ms |
+| Label | Cursor | Offset | Speedup | Δ ms |
+| --- | ---: | ---: | ---: | ---: |
+| depth=0 | 0.342ms | 0.236ms | 0.69× | -0.106ms |
+| depth=10 | 0.285ms | 0.182ms | 0.64× | -0.102ms |
+| depth=50 | 0.263ms | 0.195ms | 0.74× | -0.068ms |
+| depth=100 | 0.331ms | 0.215ms | 0.65× | -0.117ms |
+| depth=500 | 0.212ms | 0.451ms | 2.13× | 0.239ms |
+| depth=1000 | 0.176ms | 0.949ms | 5.40× | 0.774ms |
 
 ### sequential-walk
 
-| Label   | Cursor | Offset | Speedup |     Δ ms |
-| ------- | -----: | -----: | ------: | -------: |
-| walk=40 | 8.55ms | 5.59ms |   0.65× | -2.957ms |
+| Label | Cursor | Offset | Speedup | Δ ms |
+| --- | ---: | ---: | ---: | ---: |
+| walk=40 | 8.89ms | 5.55ms | 0.62× | -3.336ms |
 
 ### filtered-feed
 
-| Label      |  Cursor |  Offset | Speedup |     Δ ms |
-| ---------- | ------: | ------: | ------: | -------: |
-| depth=0    | 0.152ms | 0.149ms |   0.98× | -0.002ms |
-| depth=10   | 0.335ms | 0.284ms |   0.85× | -0.052ms |
-| depth=50   | 0.211ms | 0.199ms |   0.94× | -0.013ms |
-| depth=100  | 0.209ms | 0.244ms |   1.17× |  0.035ms |
-| depth=500  | 0.203ms | 0.639ms |   3.15× |  0.436ms |
-| depth=1000 | 0.179ms |  1.12ms |   6.27× |  0.944ms |
+| Label | Cursor | Offset | Speedup | Δ ms |
+| --- | ---: | ---: | ---: | ---: |
+| depth=0 | 0.130ms | 0.423ms | 3.24× | 0.292ms |
+| depth=10 | 0.341ms | 0.284ms | 0.83× | -0.057ms |
+| depth=50 | 0.270ms | 0.217ms | 0.80× | -0.053ms |
+| depth=100 | 0.201ms | 0.213ms | 1.06× | 0.013ms |
+| depth=500 | 0.186ms | 0.614ms | 3.31× | 0.428ms |
+| depth=1000 | 0.152ms | 1.19ms | 7.82× | 1.03ms |
 
 ### author-timeline
 
-| Label    |  Cursor |  Offset | Speedup |     Δ ms |
-| -------- | ------: | ------: | ------: | -------: |
-| depth=0  | 0.131ms | 0.129ms |   0.99× | -0.001ms |
-| depth=5  | 0.177ms | 0.129ms |   0.73× | -0.048ms |
-| depth=10 | 0.357ms | 0.156ms |   0.44× | -0.202ms |
-| depth=25 | 0.180ms | 0.146ms |   0.81× | -0.035ms |
-| walk=40  |  7.25ms |  7.05ms |   0.97× | -0.194ms |
+| Label | Cursor | Offset | Speedup | Δ ms |
+| --- | ---: | ---: | ---: | ---: |
+| depth=0 | 0.108ms | 0.384ms | 3.55× | 0.276ms |
+| depth=5 | 0.154ms | 0.109ms | 0.71× | -0.045ms |
+| depth=10 | 0.154ms | 0.115ms | 0.75× | -0.039ms |
+| depth=25 | 0.152ms | 0.128ms | 0.84× | -0.024ms |
+| walk=40 | 7.28ms | 5.57ms | 0.76× | -1.714ms |
 
 ### scoreboard
 
-| Label      |  Cursor |  Offset | Speedup |     Δ ms |
-| ---------- | ------: | ------: | ------: | -------: |
-| depth=0    | 0.134ms | 0.127ms |   0.95× | -0.006ms |
-| depth=10   | 0.234ms | 0.146ms |   0.62× | -0.088ms |
-| depth=50   | 0.197ms | 0.211ms |   1.07× |  0.014ms |
-| depth=100  | 0.312ms | 0.313ms |   1.00× |  0.001ms |
-| depth=500  | 0.179ms | 0.543ms |   3.04× |  0.364ms |
-| depth=1000 | 0.180ms | 0.829ms |   4.61× |  0.649ms |
+| Label | Cursor | Offset | Speedup | Δ ms |
+| --- | ---: | ---: | ---: | ---: |
+| depth=0 | 0.101ms | 0.103ms | 1.02× | 0.002ms |
+| depth=10 | 0.159ms | 0.104ms | 0.65× | -0.056ms |
+| depth=50 | 0.156ms | 0.127ms | 0.81× | -0.029ms |
+| depth=100 | 0.165ms | 0.158ms | 0.96× | -0.006ms |
+| depth=500 | 0.154ms | 0.384ms | 2.50× | 0.230ms |
+| depth=1000 | 0.146ms | 0.686ms | 4.69× | 0.540ms |
 
 ### ideal-baseline
 
-| Label      |  Cursor |  Offset | Speedup |     Δ ms |
-| ---------- | ------: | ------: | ------: | -------: |
-| depth=0    | 0.094ms | 0.072ms |   0.76× | -0.023ms |
-| depth=50   | 0.109ms | 0.104ms |   0.96× | -0.004ms |
-| depth=100  | 0.113ms | 0.139ms |   1.23× |  0.026ms |
-| depth=500  | 0.101ms | 0.402ms |   3.99× |  0.301ms |
-| depth=1000 | 0.095ms | 0.684ms |   7.24× |  0.590ms |
+| Label | Cursor | Offset | Speedup | Δ ms |
+| --- | ---: | ---: | ---: | ---: |
+| depth=0 | 0.077ms | 0.069ms | 0.89× | -0.009ms |
+| depth=50 | 0.095ms | 0.088ms | 0.92× | -0.007ms |
+| depth=100 | 0.086ms | 0.113ms | 1.32× | 0.027ms |
+| depth=500 | 0.078ms | 0.339ms | 4.35× | 0.261ms |
+| depth=1000 | 0.077ms | 0.626ms | 8.12× | 0.549ms |
 
 ## Deep-page growth
 
-- **postgres**: cursor ×1.05, offset ×2.86 (depth=0→depth=1000); deepest speedup 2.74×
-- **mysql**: cursor ×0.67, offset ×104.08 (depth=0→depth=1000); deepest speedup 129×
-- **mssql**: cursor ×5.82, offset ×21.40 (depth=0→depth=1000); deepest speedup 3.58×
-- **sqlite**: cursor ×0.55, offset ×3.05 (depth=0→depth=1000); deepest speedup 3.81×
+- **postgres**: cursor ×1.05, offset ×4.02 (depth=0→depth=1000); deepest speedup 3.25×
+- **mysql**: cursor ×0.72, offset ×103.26 (depth=0→depth=1000); deepest speedup 125×
+- **mssql**: cursor ×7.17, offset ×25.90 (depth=0→depth=1000); deepest speedup 3.59×
+- **sqlite**: cursor ×0.51, offset ×4.02 (depth=0→depth=1000); deepest speedup 5.40×
 
 _Absolute ms depends on machine/runner; use committed baseline diffs for regressions. Full methodology: `bench/README.md`._
