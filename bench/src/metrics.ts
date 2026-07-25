@@ -78,14 +78,3 @@ export const measure = async (opts: {
   }
   return samples
 }
-
-/**
- * Like `measure`, but times a whole multi-step walk as a single sample.
- */
-export const measureWalk = async (opts: {
-  strategy: Strategy
-  label: string
-  iterations: number
-  warmup: number
-  fn: () => Promise<number>
-}): Promise<Sample[]> => measure(opts)

@@ -11,10 +11,12 @@ import type { ComparisonRow, Sample, ScenarioContext, ScenarioResult } from '../
  *   WHERE (created_at, id) < ($1, $2)
  *   ORDER BY created_at DESC, id DESC LIMIT n
  *
- * The library instead emits null-safe OR trees
- * (`col IS NOT NULL AND col < $1 OR …`) which Postgres often evaluates as a
- * Filter over an index walk (Rows Removed by Filter ≈ OFFSET). This scenario
- * is the theoretical ceiling.
+ * Library deep-page / scoreboard sorts set `nullable: false` so they can emit
+ * the same seek-friendly shape (row compare or plain OR) plus token codec cost.
+ * Default (unmarked) library sorts still use null-safe OR trees
+ * (`col IS NOT NULL AND col < $1 OR …`), which Postgres often plans as a Filter
+ * over an index walk — comparable to OFFSET. Compare this scenario with
+ * deep-page to isolate codec + library overhead on the optimized path.
  *
  * MSSQL has no row-value constructor comparison; we fall back to the classic
  * OR form there (still without the library’s IS NOT NULL wrappers).
@@ -115,8 +117,8 @@ export const runIdealBaseline = async (ctx: ScenarioContext): Promise<ScenarioRe
     scenario: 'ideal-baseline',
     title: 'Ideal keyset baseline (raw SQL, no library)',
     description: useRowCompare
-      ? 'Textbook keyset via row comparison `(created_at, id) < ($1, $2)` vs OFFSET — no library null-safe tree, no token codec. On Postgres this becomes an Index Cond seek (buffers ≪ OFFSET). Compare with deep-page to isolate library predicate cost.'
-      : 'Classic OR keyset (`created_at < $1 OR (created_at = $1 AND id < $2)`) vs OFFSET on MSSQL (no row-value comparison). No library null-safe wrappers or token codec.',
+      ? 'Textbook keyset via row comparison `(created_at, id) < ($1, $2)` vs OFFSET — no library, no token codec. On Postgres this becomes an Index Cond seek (buffers ≪ OFFSET). Compare with library deep-page (`nullable: false`) to isolate codec/wrapper overhead on the same seek shape.'
+      : 'Classic OR keyset (`created_at < $1 OR (created_at = $1 AND id < $2)`) vs OFFSET on MSSQL (no row-value comparison). No library wrappers or token codec.',
     samples,
     comparisons,
   }

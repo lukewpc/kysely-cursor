@@ -132,11 +132,13 @@ const renderTakeaways = (report: BenchReport): string => {
   }
 
   lines.push('  • Shallow pages are often similar for both strategies (one page of work either way).')
-  lines.push('  • Default (unmarked) leading sorts use null-safe OR trees. Mark non-null keys with')
-  lines.push('    `nullable: false` so the library can emit plain OR or row compare (Postgres/SQLite/')
-  lines.push('    MySQL). Row compare becomes an Index Cond seek on Postgres; see plans.')
-  lines.push('  • The ideal-baseline scenario shows textbook keyset SQL without the library’s')
-  lines.push('    token codec; with `nullable: false` the library deep-page path should approach it.')
+  lines.push('  • Timed library scenarios use `nullable: false` on non-null sort keys so the')
+  lines.push('    library can emit plain OR or row compare (Postgres/SQLite/MySQL). Row compare')
+  lines.push('    becomes an Index Cond seek on Postgres; see plans.')
+  lines.push('  • Default (unmarked) leading sorts still use null-safe OR trees — EXPLAIN only,')
+  lines.push('    not a timed cell. Mark non-null keys with `nullable: false` in production feeds.')
+  lines.push('  • ideal-baseline is textbook keyset SQL without the library token codec; with')
+  lines.push('    `nullable: false`, library deep-page should approach that ceiling.')
   lines.push('  • Cursor still wins on correctness under concurrent inserts/deletes (no skipped/')
   lines.push('    duplicated rows). Prefer cursor for infinite scroll; offset for jump-to-page-N.')
   return lines.join('\n')
@@ -199,7 +201,8 @@ export const renderMarkdown = (report: BenchReport): string => {
       lines.push('### Query plans')
       lines.push('')
       lines.push(
-        'Library-shaped keyset (null-safe OR tree), ideal textbook keyset, and OFFSET at the deepest measured page.',
+        'At the deepest measured page: library seek form (`nullable: false` → row compare), ' +
+          'library default null-safe OR (untimed reference), and OFFSET.',
       )
       lines.push('')
       for (const plan of dialect.plans) {

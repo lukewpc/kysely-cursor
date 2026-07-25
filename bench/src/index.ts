@@ -14,11 +14,13 @@ Usage:
 
 Options:
   --dialect <name[,name…]>   postgres | mysql | mssql | sqlite  (default: all)
-  --rows <n>                 rows to seed                       (default: 100000, quick: 10000)
+  --rows <n>                 rows to seed                       (default: 200000, quick: 20000)
   --page-size <n>            page size                          (default: 25)
   --depths <n,n,…>           deep-page depths (0-based)
-  --walk-pages <n>           sequential-walk page count         (default: 200, quick: 40)
-  --iterations <n>           timed iterations per measurement   (default: 15, quick: 5)
+                             default: 0,10,50,100,500,1000,2000,4000
+                             quick:   0,10,50,200,400
+  --walk-pages <n>           sequential-walk page count         (default: 150, quick: 40)
+  --iterations <n>           timed iterations per measurement   (default: 12, quick: 5)
   --warmup <n>               warmup iterations                  (default: 3, quick: 1)
   --out <dir>                results directory                  (default: ./bench/results)
   --quick                    smaller dataset / fewer iterations

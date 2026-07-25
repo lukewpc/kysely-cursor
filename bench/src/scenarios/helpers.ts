@@ -178,4 +178,41 @@ export const timeBothStrategies = async (opts: {
   return [...cursorSamples, ...offsetSamples]
 }
 
+/**
+ * Fair single-page cursor vs offset sweep at each depth.
+ * Cursor tokens are pre-resolved outside the timer; offset uses depth × pageSize.
+ */
+export const runDepthSweep = async (opts: {
+  ctx: ScenarioContext
+  query: QueryFactory
+  sorts: SortSpec
+  depths: number[]
+  /** Console prefix, e.g. "deep-page" or "scoreboard". */
+  logPrefix: string
+}): Promise<{ samples: Sample[]; labels: string[] }> => {
+  const { ctx, query, sorts, depths, logPrefix } = opts
+  const { handle, pageSize } = ctx
+  const samples: Sample[] = []
+  const labels: string[] = []
+
+  for (const depth of depths) {
+    const label = `depth=${depth}`
+    labels.push(label)
+    process.stdout.write(`    ${logPrefix} ${label}…\n`)
+
+    const token = await resolveCursorAtDepth(handle.paginator, query, sorts, pageSize, depth)
+    const offset = depth * pageSize
+
+    const batch = await timeBothStrategies({
+      ctx,
+      label,
+      cursorFn: () => fetchCursorPage(handle.paginator, query, sorts, pageSize, token),
+      offsetFn: () => fetchOffsetPage(handle.paginator, query, sorts, pageSize, offset),
+    })
+    samples.push(...batch)
+  }
+
+  return { samples, labels }
+}
+
 export type { Strategy }

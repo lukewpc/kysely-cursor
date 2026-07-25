@@ -2,8 +2,10 @@ import { applyPageWindow } from './dialects/query.js'
 import type { DialectHandle } from './types.js'
 
 /**
- * Capture EXPLAIN output for library-shaped cursor SQL, ideal row-comparison
- * keyset, and OFFSET at a deep page. Postgres only (DialectHandle.explain).
+ * Capture EXPLAIN output at a deep page (Postgres only via DialectHandle.explain):
+ * 1. Library seek path (`nullable: false` → row compare) — matches timed deep-page
+ * 2. Library default null-safe OR — untimed reference (often Filter ≈ OFFSET)
+ * 3. OFFSET — baseline skip plan
  */
 export const captureDeepPlans = async (handle: DialectHandle, pageSize: number, depth: number): Promise<string[]> => {
   if (!handle.explain || depth <= 0) return []

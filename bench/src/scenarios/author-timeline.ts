@@ -3,9 +3,7 @@ import type { ScenarioContext, ScenarioResult } from '../types.js'
 import {
   authorPostsQuery,
   buildComparisons,
-  fetchCursorPage,
-  fetchOffsetPage,
-  resolveCursorAtDepth,
+  runDepthSweep,
   timeBothStrategies,
   walkCursor,
   walkOffset,
@@ -28,25 +26,13 @@ export const runAuthorTimeline = async (ctx: ScenarioContext): Promise<ScenarioR
   const depths = [0, 5, 10, 25, 50, 100].filter((d) => d <= maxDepth)
   const walkPages = Math.min(40, maxDepth + 1)
 
-  const samples = []
-  const labels: string[] = []
-
-  for (const depth of depths) {
-    const label = `depth=${depth}`
-    labels.push(label)
-    process.stdout.write(`    author-timeline ${label}…\n`)
-
-    const token = await resolveCursorAtDepth(handle.paginator, query, sorts, pageSize, depth)
-    const offset = depth * pageSize
-
-    const batch = await timeBothStrategies({
-      ctx,
-      label,
-      cursorFn: () => fetchCursorPage(handle.paginator, query, sorts, pageSize, token),
-      offsetFn: () => fetchOffsetPage(handle.paginator, query, sorts, pageSize, offset),
-    })
-    samples.push(...batch)
-  }
+  const { samples, labels } = await runDepthSweep({
+    ctx,
+    query,
+    sorts,
+    depths,
+    logPrefix: 'author-timeline',
+  })
 
   if (walkPages > 1) {
     const label = `walk=${walkPages}`

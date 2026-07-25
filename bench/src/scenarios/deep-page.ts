@@ -1,13 +1,6 @@
 import { feedSorts } from '../schema.js'
 import type { ScenarioContext, ScenarioResult } from '../types.js'
-import {
-  basePostsQuery,
-  buildComparisons,
-  fetchCursorPage,
-  fetchOffsetPage,
-  resolveCursorAtDepth,
-  timeBothStrategies,
-} from './helpers.js'
+import { basePostsQuery, buildComparisons, runDepthSweep } from './helpers.js'
 
 /**
  * Fair single-page comparison at increasing depths.
@@ -21,26 +14,14 @@ import {
  * Expectation: cursor stays flat; offset grows with depth.
  */
 export const runDeepPage = async (ctx: ScenarioContext): Promise<ScenarioResult> => {
-  const { handle, pageSize, deepPageDepths } = ctx
-  const query = () => basePostsQuery(handle)
-  const sorts = feedSorts
-  const samples = []
-
-  for (const depth of deepPageDepths) {
-    const label = `depth=${depth}`
-    process.stdout.write(`    deep-page ${label}…\n`)
-
-    const token = await resolveCursorAtDepth(handle.paginator, query, sorts, pageSize, depth)
-    const offset = depth * pageSize
-
-    const batch = await timeBothStrategies({
-      ctx,
-      label,
-      cursorFn: () => fetchCursorPage(handle.paginator, query, sorts, pageSize, token),
-      offsetFn: () => fetchOffsetPage(handle.paginator, query, sorts, pageSize, offset),
-    })
-    samples.push(...batch)
-  }
+  const { handle, deepPageDepths } = ctx
+  const { samples, labels } = await runDepthSweep({
+    ctx,
+    query: () => basePostsQuery(handle),
+    sorts: feedSorts,
+    depths: deepPageDepths,
+    logPrefix: 'deep-page',
+  })
 
   return {
     scenario: 'deep-page',
@@ -48,11 +29,6 @@ export const runDeepPage = async (ctx: ScenarioContext): Promise<ScenarioResult>
     description:
       'Library API: one page at increasing depths. Cursor tokens are pre-resolved so only the page query is timed. Offset uses OFFSET = depth × pageSize. Feed sorts use nullable: false so the library emits seek-friendly keyset SQL (row compare / plain OR) plus the token codec.',
     samples,
-    comparisons: buildComparisons(
-      handle.name,
-      'deep-page',
-      samples,
-      deepPageDepths.map((d) => `depth=${d}`),
-    ),
+    comparisons: buildComparisons(handle.name, 'deep-page', samples, labels),
   }
 }

@@ -1,13 +1,6 @@
 import { feedSorts } from '../schema.js'
 import type { ScenarioContext, ScenarioResult } from '../types.js'
-import {
-  buildComparisons,
-  fetchCursorPage,
-  fetchOffsetPage,
-  publishedPostsQuery,
-  resolveCursorAtDepth,
-  timeBothStrategies,
-} from './helpers.js'
+import { buildComparisons, publishedPostsQuery, runDepthSweep } from './helpers.js'
 
 /**
  * Filtered product feed: WHERE status = 'published' ORDER BY created_at DESC, id DESC.
@@ -17,30 +10,17 @@ import {
  */
 export const runFilteredFeed = async (ctx: ScenarioContext): Promise<ScenarioResult> => {
   const { handle, pageSize, deepPageDepths } = ctx
-  const query = () => publishedPostsQuery(handle)
-  const sorts = feedSorts
 
   // Fewer depths than deep-page — filtered set is ~70% of total.
   const depths = deepPageDepths.filter((d) => d <= Math.floor(ctx.totalRows * 0.7) / pageSize - 1).slice(0, 6)
-  const labels: string[] = []
-  const samples = []
 
-  for (const depth of depths) {
-    const label = `depth=${depth}`
-    labels.push(label)
-    process.stdout.write(`    filtered-feed ${label}…\n`)
-
-    const token = await resolveCursorAtDepth(handle.paginator, query, sorts, pageSize, depth)
-    const offset = depth * pageSize
-
-    const batch = await timeBothStrategies({
-      ctx,
-      label,
-      cursorFn: () => fetchCursorPage(handle.paginator, query, sorts, pageSize, token),
-      offsetFn: () => fetchOffsetPage(handle.paginator, query, sorts, pageSize, offset),
-    })
-    samples.push(...batch)
-  }
+  const { samples, labels } = await runDepthSweep({
+    ctx,
+    query: () => publishedPostsQuery(handle),
+    sorts: feedSorts,
+    depths,
+    logPrefix: 'filtered-feed',
+  })
 
   return {
     scenario: 'filtered-feed',

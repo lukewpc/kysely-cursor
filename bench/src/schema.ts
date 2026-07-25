@@ -2,13 +2,13 @@ import type { Post } from './types.js'
 
 /**
  * Sort sets mirror common product patterns:
- * - chronological feed (created_at + id tie-breaker)
- * - scoreboard / ranking
+ * - chronological feed (created_at + id) — deep-page, walks, filtered, author
+ * - scoreboard / ranking (score + id) — scoreboard scenario
  *
  * The final key is always non-null unique `id`.
+ * `nullable: false` opts into seek-friendly keyset emission (row compare / plain OR);
+ * created_at and score are NOT NULL in the bench schema.
  */
-// nullable: false opts into seek-friendly keyset emission (row compare / plain OR).
-// created_at and score are NOT NULL in the bench schema.
 export const feedSorts = [
   {
     col: 'posts.created_at' as const,

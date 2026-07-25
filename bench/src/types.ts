@@ -21,7 +21,13 @@ export interface BenchDB {
 
 export type Post = Selectable<PostsTable>
 
-export type ScenarioId = 'deep-page' | 'sequential-walk' | 'filtered-feed' | 'author-timeline' | 'ideal-baseline'
+export type ScenarioId =
+  | 'deep-page'
+  | 'sequential-walk'
+  | 'filtered-feed'
+  | 'author-timeline'
+  | 'scoreboard'
+  | 'ideal-baseline'
 
 export type Strategy = 'cursor' | 'offset'
 
