@@ -141,17 +141,27 @@ Provide an ordered **sort set** that uniquely identifies rows:
 
 ```ts
 const sorts = [
-  { col: 'users.created_at', dir: 'desc', output: 'created_at' },
+  { col: 'users.created_at', dir: 'desc', output: 'created_at', nulls: 'last' },
   { col: 'users.id', dir: 'desc', output: 'id' }, // final non‑nullable & unique key
 ] as const
 ```
 
 - Leading sorts take precedence over later sorts.
-- Leading sorts may be nullable; the **final sort must be non‑nullable & unique**.
-- Use a primary key or a unique index for the final sort, this acts as a tie-breaker.
+- Leading sorts may be nullable; the **final sort must be non-nullable & unique**.
+- Use a primary key or a unique index for the final sort — this acts as a tie-breaker.
 - `dir` is the sort direction. Defaults to `asc`.
 - `col` is the field to sort by, optionally qualified.
 - `output` is the field name in your outputted rows. Defaults to `col`, without the qualifying prefix. May need to be explicitly set if your `col` is aliased in your select statement.
+- `nulls` is an optional per-sort null ordering hint:
+
+  ```ts
+  { col: 'users.deleted_at', dir: 'asc', nulls: 'last' }
+  ```
+
+  - `'first'` → place all `NULL`s before non-NULLs for that sort
+  - `'last'` → place all `NULL`s after non-NULLs for that sort
+  - If omitted, the dialect’s defaults are used (see below).
+  - On dialects that **don’t** support `NULLS FIRST / LAST` (e.g. MySQL, MSSQL), providing `nulls` will throw a `PaginationError` at runtime — so only specify it when the dialect can express it.
 
 ### Dialects
 
@@ -180,7 +190,7 @@ The default cursor codec is `codecPipe(superJsonCodec, base64UrlCodec)`.
 ### Null Sorting Behavior
 
 Handling of `NULL` values during sorting differs between database engines.
-To ensure consistent pagination behavior across dialects, this library **normalizes** null sorting rules.
+To ensure consistent pagination behavior across dialects, this library now supports **explicit** null ordering on each sort key (`nulls: 'first' | 'last'`) and falls back to dialect-aware defaults when it’s not provided.
 
 | Database System                  | Default NULLs (ASC) | Default NULLs (DESC) | Supports `NULLS FIRST / LAST`? |
 | -------------------------------- | ------------------- | -------------------- | ------------------------------ |
@@ -191,17 +201,23 @@ To ensure consistent pagination behavior across dialects, this library **normali
 
 #### Current behavior
 
-Because **PostgreSQL** is the _odd one out_ (sorting NULLs last on ascending by default),
-this library **inverts Postgres’s null ordering** to match the behaviour of the other supported dialects:
+1. **You can set it yourself**
+   On sorts where the column can be nullable, add:
 
-- Ascending (`ASC`) → `NULLS FIRST`
-- Descending (`DESC`) → `NULLS LAST`
+```ts
+const sort = { col: 'posts.published_at', dir: 'asc', nulls: 'last' }
+```
 
-This ensures consistent cursor pagination semantics across all engines, even when nullable sort keys are involved.
+If the dialect supports `NULLS FIRST / LAST` (Postgres, SQLite ≥ 3.30.0), this will be emitted as part of the `ORDER BY`. If it **doesn’t** (MySQL, MSSQL), the library throws a `PaginationError` with `code: 'INVALID_SORT'`, so you don’t silently get inconsistent pagination.
 
-#### Future plans
+2. **If you don’t set it, the dialect decides**
+   Each dialect declares:
+   - whether it supports explicit null directives
+   - what its default “ascending NULL placement” is
 
-In a future release, customizable null sorting behavior may be introduced for dialects that support `NULLS FIRST` / `NULLS LAST` natively (e.g. PostgreSQL, SQLite).
+   The paginator then:
+   - uses that default when `dir === 'asc'`
+   - uses the **inverted** default when `dir === 'desc'` (so if ASC puts NULLs first, DESC will put them last)
 
 ---
 
@@ -296,7 +312,7 @@ export type PaginatedResultWithEdges<T> = {
 
 ```ts
 const sorts = [
-  { col: 'posts.published_at', dir: 'desc', output: 'published_at' },
+  { col: 'posts.published_at', dir: 'desc', nulls: 'last', output: 'published_at' },
   { col: 'posts.id', dir: 'desc', output: 'id' },
 ] as const
 
@@ -395,7 +411,9 @@ The library over‑fetches by `limit+1` to determine if there’s another page. 
 forward; an empty result returns no tokens.
 
 **How are NULLs handled?**
-Ascending sorts treat NULLs first; descending sorts push NULLs last.
+You can now control this per sort via `nulls: 'first' | 'last'` on dialects that support it. If you omit it, the dialect’s
+declared defaults are used, and descending sorts get the inverse of the ascending default. On dialects that can’t express
+null placement, specifying `nulls` throws an error so you don’t get silent drift.
 
 ---
 

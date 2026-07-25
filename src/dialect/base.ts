@@ -1,8 +1,11 @@
-import { OrderByExpression, SelectQueryBuilder } from 'kysely'
-import { DialectMeta, PaginationDialect } from '../types.js'
-import { SortSet } from '../sorting.js'
-import { buildCursorPredicateRecursive, DecodedCursorNextPrev } from '../cursor.js'
+import type { OrderByExpression, SelectQueryBuilder } from 'kysely'
+
 import { PaginationError } from '~/error.js'
+
+import type { DecodedCursorNextPrev } from '../cursor.js'
+import { buildCursorPredicateRecursive } from '../cursor.js'
+import type { SortSet } from '../sorting.js'
+import type { DialectMeta, PaginationDialect } from '../types.js'
 
 export abstract class BasePaginationDialect implements PaginationDialect {
   abstract meta: DialectMeta

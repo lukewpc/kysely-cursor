@@ -20,7 +20,7 @@ export { buildCursorPredicateRecursive, CursorIncoming, EdgeOutgoing } from './c
 export { ErrorCode, PaginationError } from './error.js'
 
 // paginator
-export { createPaginator, paginateWithEdges, paginate } from './paginator.js'
+export { createPaginator, paginate, paginateWithEdges } from './paginator.js'
 export type {
   PaginateArgs,
   PaginatedResult,

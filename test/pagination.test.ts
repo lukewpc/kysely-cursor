@@ -4,7 +4,7 @@ import { base64UrlCodec } from '~/codec/base64Url.js'
 import { codecPipe } from '~/codec/codec.js'
 import { superJsonCodec } from '~/codec/superJson.js'
 import * as cursorModule from '~/cursor.js'
-import { buildCursorPredicateRecursive, decodeCursor, resolveCursor, sortSignature } from '~/cursor.js'
+import { buildCursorPredicateRecursive, CURSOR_VERSION, decodeCursor, resolveCursor, sortSignature } from '~/cursor.js'
 import { PaginationError } from '~/error.js'
 import { paginate, paginateWithEdges } from '~/paginator.js'
 import type { SortSet } from '~/sorting.js'
@@ -312,6 +312,7 @@ describe('null-aware sorting', () => {
     ]
 
     const decoded = {
+      v: CURSOR_VERSION,
       sig: sortSignature(sorts),
       k: {
         name: null,
@@ -384,6 +385,7 @@ describe('null-aware sorting', () => {
     ]
 
     const decoded = {
+      v: CURSOR_VERSION,
       sig: sortSignature(sorts),
       k: {
         name: null,
@@ -436,5 +438,78 @@ describe('null-aware sorting', () => {
         },
       ],
     })
+  })
+
+  it('rejects a NULL value on the final sort key', () => {
+    const sorts: SortSet<DB, 'users', UserRow> = [
+      { col: 'users.name', dir: 'asc', nulls: 'first' },
+      { col: 'users.id', dir: 'asc' },
+    ]
+
+    const decoded = {
+      v: CURSOR_VERSION,
+      sig: sortSignature(sorts),
+      k: {
+        name: 'Alpha',
+        id: null, // final sort must be non-nullable — token is malformed/tampered
+      },
+    }
+
+    const eb: any = (col: any, op: any, value: any) => ({ type: 'cmp', col, op, value })
+    eb.and = (parts: any[]) => ({ type: 'and', parts })
+    eb.or = (parts: any[]) => ({ type: 'or', parts })
+
+    expect(() => buildCursorPredicateRecursive(eb, sorts, decoded, TestDialect.meta)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_TOKEN' }),
+    )
+  })
+})
+
+describe('cursor token hygiene', () => {
+  it('classifies undecodable tokens as INVALID_TOKEN', async () => {
+    await expect(decodeCursor({ nextPage: '!!!not-a-token!!!' }, cursorCodec)).rejects.toMatchObject({
+      code: 'INVALID_TOKEN',
+    })
+  })
+
+  it('classifies decodable but malformed payloads as INVALID_TOKEN', async () => {
+    const token = await cursorCodec.encode({ hello: 'world' })
+    await expect(decodeCursor({ nextPage: token }, cursorCodec)).rejects.toMatchObject({
+      code: 'INVALID_TOKEN',
+      message: 'Invalid page token',
+    })
+  })
+
+  it('rejects tokens from an incompatible cursor version loudly', async () => {
+    const sorts = validSortsQualifiedOnly
+    const payload = { ...resolveCursor({ id: 1, created_at: new Date() } as any, sorts), v: 999 }
+    const token = await cursorCodec.encode(payload)
+
+    await expect(decodeCursor({ nextPage: token }, cursorCodec)).rejects.toMatchObject({
+      code: 'INVALID_TOKEN',
+      message: 'Unsupported cursor version: 999',
+    })
+  })
+
+  it('rejects legacy tokens without a version field', async () => {
+    const sorts = validSortsQualifiedOnly
+    const payload: any = resolveCursor({ id: 1, created_at: new Date() } as any, sorts)
+    delete payload.v // simulate a token minted before versioning existed
+    const token = await cursorCodec.encode(payload)
+
+    await expect(decodeCursor({ nextPage: token }, cursorCodec)).rejects.toMatchObject({
+      code: 'INVALID_TOKEN',
+      message: 'Invalid page token',
+    })
+  })
+
+  it('round-trips payloads including the version field', async () => {
+    const sorts = validSortsQualifiedOnly
+    const payload = resolveCursor({ id: 1, created_at: new Date('2023-01-01T00:00:00Z') } as any, sorts)
+    expect(payload.v).toBe(CURSOR_VERSION)
+
+    const token = await cursorCodec.encode(payload)
+    const decoded = await decodeCursor({ nextPage: token }, cursorCodec)
+    expect(decoded).toMatchObject({ type: 'next', payload: { v: CURSOR_VERSION, sig: payload.sig } })
   })
 })

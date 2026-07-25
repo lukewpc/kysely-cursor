@@ -2,7 +2,7 @@ import type { SelectQueryBuilder } from 'kysely'
 
 import type { Codec } from './codec/codec.js'
 import type { CursorIncoming, CursorOutgoing, DecodedCursorNextPrev, EdgeOutgoing } from './cursor.js'
-import { NullsDirection, SortSet } from './sorting.js'
+import type { NullsDirection, SortSet } from './sorting.js'
 
 export type DialectMeta = {
   supportsNullSortDirective: boolean

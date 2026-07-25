@@ -6,8 +6,8 @@ import { superJsonCodec } from '~/codec/superJson.js'
 import { invertNulls, resolveCursor } from '~/cursor.js'
 import type { PaginatedResult } from '~/index.js'
 import { createPaginator } from '~/index.js'
-import { NullsDirection, SortSet } from '~/sorting.js'
-import { DialectMeta, PaginationDialect } from '~/types.js'
+import type { NullsDirection, SortSet } from '~/sorting.js'
+import type { DialectMeta, PaginationDialect } from '~/types.js'
 
 export interface UsersTable {
   id: Generated<number>
@@ -291,13 +291,179 @@ export const runSharedTests = (
     }
   })
 
+  // regression: walking backward must replay forward pages even when a page boundary
+  // falls inside (or next to) the NULL block
+  it('walks backward across a NULL boundary with dialect-default null placement', async () => {
+    const { baseBuilder, paginator, page } = createHelpers()
+    const sorts: SortSet<TestDB, 'users', TestRow> = [
+      { col: 'users.rating', dir: 'asc' },
+      { col: 'users.id', dir: 'asc' },
+    ]
+
+    const limit = 4
+    const first = await page(limit, sorts)
+    const second = await page(limit, sorts, first.nextPage)
+    const third = await page(limit, sorts, second.nextPage)
+
+    expect(third.prevPage).toBeTruthy()
+
+    // step back twice: at least one of these hops crosses the NULL boundary
+    // regardless of where this dialect places NULLs for ASC
+    const backOne = await paginator.paginate({
+      query: baseBuilder(),
+      sorts,
+      limit,
+      cursor: { prevPage: third.prevPage! },
+    })
+    expect(backOne.items.map((r) => r.id)).toEqual(second.items.map((r) => r.id))
+
+    expect(backOne.prevPage).toBeTruthy()
+    const backTwo = await paginator.paginate({
+      query: baseBuilder(),
+      sorts,
+      limit,
+      cursor: { prevPage: backOne.prevPage! },
+    })
+    expect(backTwo.items.map((r) => r.id)).toEqual(first.items.map((r) => r.id))
+
+    // and going forward again returns the same pages
+    const forwardAgain = await paginator.paginate({
+      query: baseBuilder(),
+      sorts,
+      limit,
+      cursor: { nextPage: backTwo.nextPage! },
+    })
+    expect(forwardAgain.items.map((r) => r.id)).toEqual(second.items.map((r) => r.id))
+  })
+
+  // same as above, but with an explicit nulls directive — the inverted (backward) query
+  // must flip the directive too, otherwise the backward order is not the reverse of the
+  // forward order and pages come back wrong across the NULL boundary
+  const itSupportsNulls = meta.supportsNullSortDirective ? it : it.skip
+  itSupportsNulls('walks backward across a NULL boundary with an explicit nulls directive', async () => {
+    const { baseBuilder, paginator, page } = createHelpers()
+    const sorts: SortSet<TestDB, 'users', TestRow> = [
+      { col: 'users.rating', dir: 'asc', nulls: 'last' },
+      { col: 'users.id', dir: 'asc' },
+    ]
+
+    // with NULLS LAST the final page starts inside the NULL block, so stepping back
+    // from it must cross the NULL → non-NULL boundary
+    const limit = 4
+    const first = await page(limit, sorts)
+    const second = await page(limit, sorts, first.nextPage)
+    const third = await page(limit, sorts, second.nextPage)
+    const fourth = await page(limit, sorts, third.nextPage)
+
+    expect(fourth.items.length).toBeGreaterThan(0)
+    expect(fourth.items[0]!.rating).toBeNull()
+
+    const backOne = await paginator.paginate({
+      query: baseBuilder(),
+      sorts,
+      limit,
+      cursor: { prevPage: fourth.prevPage! },
+    })
+    expect(backOne.items.map((r) => r.id)).toEqual(third.items.map((r) => r.id))
+
+    const backTwo = await paginator.paginate({
+      query: baseBuilder(),
+      sorts,
+      limit,
+      cursor: { prevPage: backOne.prevPage! },
+    })
+    expect(backTwo.items.map((r) => r.id)).toEqual(second.items.map((r) => r.id))
+  })
+
+  // property: for any sort set and page size, paginating all the way forward and then
+  // all the way back must replay the exact same pages in reverse order
+  it('round-trips: forward then backward pagination replays identical pages', async () => {
+    const { baseBuilder, paginator } = createHelpers()
+
+    const sortVariants: SortSet<TestDB, 'users', TestRow>[] = [
+      // non-nullable baseline
+      [
+        { col: 'users.created_at', dir: 'asc' },
+        { col: 'users.id', dir: 'asc' },
+      ],
+      // nullable leading sort, dialect-default placement
+      [
+        { col: 'users.rating', dir: 'asc' },
+        { col: 'users.id', dir: 'asc' },
+      ],
+      [
+        { col: 'users.rating', dir: 'desc' },
+        { col: 'users.id', dir: 'asc' },
+      ],
+    ]
+
+    if (meta.supportsNullSortDirective) {
+      sortVariants.push(
+        [
+          { col: 'users.rating', dir: 'asc', nulls: 'first' },
+          { col: 'users.id', dir: 'asc' },
+        ],
+        [
+          { col: 'users.rating', dir: 'asc', nulls: 'last' },
+          { col: 'users.id', dir: 'desc' },
+        ],
+        [
+          { col: 'users.rating', dir: 'desc', nulls: 'first' },
+          { col: 'users.id', dir: 'asc' },
+        ],
+      )
+    }
+
+    const ids = (pages: TestRow[][]) => pages.map((p) => p.map((r) => r.id))
+
+    for (const sorts of sortVariants) {
+      for (const limit of [1, 2, 3, 5]) {
+        // walk forward through every page
+        const forwardPages: TestRow[][] = []
+        let nextToken: string | undefined
+        let lastPrevToken: string | undefined
+        do {
+          const res = await paginator.paginate({
+            query: baseBuilder(),
+            sorts,
+            limit,
+            cursor: nextToken ? { nextPage: nextToken } : undefined,
+          })
+          forwardPages.push(res.items)
+          nextToken = res.nextPage
+          lastPrevToken = res.prevPage
+        } while (nextToken)
+
+        // walk all the way back from the last page
+        const backwardPages: TestRow[][] = []
+        let prevToken = lastPrevToken
+        while (prevToken) {
+          const res = await paginator.paginate({
+            query: baseBuilder(),
+            sorts,
+            limit,
+            cursor: { prevPage: prevToken },
+          })
+          backwardPages.push(res.items)
+          prevToken = res.prevPage
+        }
+
+        // the backward walk replays every forward page except the one we started from, in reverse
+        expect(ids(backwardPages)).toEqual(ids(forwardPages.slice(0, -1).reverse()))
+      }
+    }
+  })
+
   it('throws on malformed page tokens', async () => {
     const { page } = createHelpers()
     const sorts: SortSet<TestDB, 'users', TestRow> = [
       { col: 'users.created_at', dir: 'asc' },
       { col: 'users.id', dir: 'asc' },
     ]
-    await expect(page(5, sorts, 'this-is-not-a-valid-token')).rejects.toThrowError(/Failed to paginate/i)
+    await expect(page(5, sorts, 'this-is-not-a-valid-token')).rejects.toMatchObject({
+      code: 'INVALID_TOKEN',
+      message: 'Invalid page token',
+    })
   })
 
   it('throws when page token does not match the provided sort signature', async () => {

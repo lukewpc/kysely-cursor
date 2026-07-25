@@ -1,4 +1,5 @@
 import type { SelectQueryBuilder } from 'kysely'
+
 import { BasePaginationDialect } from '~/dialect/base.js'
 
 /**

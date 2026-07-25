@@ -1,12 +1,12 @@
 import type { SelectQueryBuilder } from 'kysely'
 
 import type { EdgeOutgoing } from '~/cursor.js'
-
 import { MssqlPaginationDialect } from '~/dialect/mssql.js'
 import { PostgresPaginationDialect } from '~/dialect/postgres.js'
-import { createPaginator } from '../src/index.js'
 import type { SortSet } from '~/sorting.js'
 import type { PaginatedResult, PaginatedResultWithEdges } from '~/types.js'
+
+import { createPaginator } from '../src/index.js'
 
 type UserRow = {
   id: number
