@@ -214,12 +214,42 @@ jobs:
           fi
           mkdir -p bench/results
           # pnpm --filter runs with cwd=bench/; use absolute merge paths.
+          # Writes pr-comment.md + results/charts/*.png (Chart.js PNGs).
           pnpm --filter kysely-cursor-bench bench -- \
             --merge "${{ github.workspace }}/bench/artifacts" \
             --git-sha "${{ github.sha }}" \
             --compare \
             --threshold 1.5 \
             --comment-out results/pr-comment.md
+
+      # Sticky PR comments need absolute image URLs. Publish Chart.js PNGs to a
+      # per-PR orphan-ish branch and rewrite markdown to raw.githubusercontent.com.
+      - name: Publish chart images for PR comment
+        if: github.event_name == 'pull_request' && hashFiles('bench/results/charts/*.png') != ''
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          PR="${{ github.event.pull_request.number }}"
+          REF="refs/heads/bench-charts/pr-${PR}"
+          WORK=/tmp/bench-chart-publish
+          rm -rf "$WORK"
+          mkdir -p "$WORK"
+          cp bench/results/charts/*.png "$WORK/"
+          cd "$WORK"
+          git init -q
+          git checkout -q -b "pr-${PR}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add *.png
+          git commit -q -m "bench charts for PR ${PR} @ ${{ github.sha }}"
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
+          git push -qf origin "HEAD:${REF}"
+          BASE="https://raw.githubusercontent.com/${{ github.repository }}/bench-charts/pr-${PR}"
+          # Relative charts/… → absolute raw URLs for the sticky comment.
+          sed -i "s|(charts/|(${BASE}/|g" "${{ github.workspace }}/bench/results/pr-comment.md"
+          echo "Chart base URL: ${BASE}"
 
       - name: Upload merged bench artifacts
         if: always()

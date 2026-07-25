@@ -1,5 +1,6 @@
 import type { BaselineCell, BaselineReport, CellDelta, CompareResult } from './types.js'
 import { cellKey } from './baseline.js'
+import { renderDeepPageImageGrid, type DepthSeriesPoint } from './chart.js'
 import { DEFAULT_REGRESSION_THRESHOLD, isGatingRegression, MIN_ABS_MS, MIN_GATE_DEPTH } from './gate.js'
 import { formatMs, formatSpeedup } from './metrics.js'
 
@@ -11,6 +12,7 @@ export {
   MIN_ABS_MS,
   MIN_GATE_DEPTH,
 } from './gate.js'
+export { renderDeepPageImageGrid, renderDeepPagePng, writeDeepPageCharts } from './chart.js'
 
 const safeRatio = (current: number, baseline: number): number => {
   if (!Number.isFinite(current) || !Number.isFinite(baseline) || baseline <= 0) {
@@ -112,20 +114,48 @@ const deltaRow = (d: CellDelta): string =>
 
 const DELTA_HEADER = '| Dialect | Scenario | Label | Base | Curr | Δ |\n| --- | --- | --- | ---: | ---: | ---: |'
 
+const parseDepth = (label: string): number | null => {
+  const m = /^depth=(\d+)$/.exec(label)
+  return m ? Number(m[1]) : null
+}
+
+/** Deep-page matched cells → series points (ascending depth). */
+export const deepPageSeries = (matched: CellDelta[], dialect: string): DepthSeriesPoint[] =>
+  matched
+    .filter((m) => m.dialect === dialect && m.scenario === 'deep-page')
+    .map((m) => {
+      const depth = parseDepth(m.label)
+      if (depth === null) return null
+      return {
+        depth,
+        baselineMs: m.baseline.cursorMean,
+        currentMs: m.current.cursorMean,
+      }
+    })
+    .filter((p): p is DepthSeriesPoint => p !== null)
+    .sort((a, b) => a.depth - b.depth)
+
+export type CompareMarkdownOpts = {
+  /**
+   * Base URL or relative path for chart PNGs (no trailing slash).
+   * Local default: `charts` (next to the comment file).
+   * CI sticky comments need an https:// raw.githubusercontent.com/... base.
+   */
+  chartUrlBase?: string
+}
+
 /** Short markdown for PR sticky comments and CI logs (not a full matrix dump). */
-export const renderCompareMarkdown = (result: CompareResult): string => {
+export const renderCompareMarkdown = (result: CompareResult, opts: CompareMarkdownOpts = {}): string => {
   const lines: string[] = []
-  const { baseline, current, threshold, matched, regressions, improvements } = result
+  const { baseline, current, threshold, matched } = result
   const gated = gatingRegressions(result)
-  const noise = regressions.filter((d) => !isGatingRegression(d))
   const configMismatch = configShapeKey(baseline.config) !== configShapeKey(current.config)
+  const chartUrlBase = opts.chartUrlBase ?? 'charts'
 
   const status =
     gated.length > 0
       ? `**⚠️ ${gated.length} CI-gating regression${gated.length === 1 ? '' : 's'}**`
-      : noise.length > 0
-        ? `**✅ no CI-gating regressions** · ${noise.length} noisy cell${noise.length === 1 ? '' : 's'}`
-        : `**✅ no regressions**`
+      : `**✅ no CI-gating regressions**`
 
   lines.push(`# Benchmark comparison`)
   lines.push('')
@@ -144,44 +174,47 @@ export const renderCompareMarkdown = (result: CompareResult): string => {
     lines.push('')
   }
 
-  if (noise.length) {
-    lines.push(`### Noisy / weak (not gated)${noise.length > 5 ? ` · ${noise.length}` : ''}`)
-    lines.push('')
-    lines.push(DELTA_HEADER)
-    for (const d of noise.slice(0, 5)) lines.push(deltaRow(d))
-    if (noise.length > 5) lines.push(`_…${noise.length - 5} more_`)
-    lines.push('')
-  }
-
-  if (improvements.length) {
-    const top = improvements.slice(0, 5)
-    lines.push(`### Improvements · top ${top.length} of ${improvements.length}`)
-    lines.push('')
-    lines.push(DELTA_HEADER)
-    for (const d of top) lines.push(deltaRow(d))
-    lines.push('')
-  }
-
-  // One row per dialect: deepest deep-page cursor mean
   const dialects = [...new Set(matched.map((m) => m.dialect))].sort()
-  const headlines: CellDelta[] = []
-  for (const dialect of dialects) {
-    const deep = matched
-      .filter((m) => m.dialect === dialect && m.scenario === 'deep-page')
-      .sort((a, b) => {
-        const da = Number(a.label.replace(/\D/g, '')) || 0
-        const db = Number(b.label.replace(/\D/g, '')) || 0
-        return da - db
-      })
-    const last = deep[deep.length - 1]
-    if (last) headlines.push(last)
+  const deepCharts = dialects
+    .map((dialect) => ({ dialect, points: deepPageSeries(matched, dialect) }))
+    .filter((c) => c.points.length > 0)
+
+  if (deepCharts.length) {
+    lines.push('### Deep-page')
+    lines.push('')
+    lines.push(
+      renderDeepPageImageGrid(
+        deepCharts.map((c) => c.dialect),
+        (d) => `${chartUrlBase}/${d}.png`,
+      ),
+    )
+    lines.push('')
+    lines.push('| Dialect | Depth | Base | Curr | Δ | vs offset |')
+    lines.push('| --- | ---: | ---: | ---: | ---: | ---: |')
+    for (const { dialect, points } of deepCharts) {
+      for (const p of points) {
+        const cell = matched.find(
+          (m) => m.dialect === dialect && m.scenario === 'deep-page' && m.label === `depth=${p.depth}`,
+        )
+        if (!cell) continue
+        const mark = cell.status === 'regression' ? ' ⚠️' : cell.status === 'improvement' ? ' ✅' : ''
+        lines.push(
+          `| ${dialect} | ${p.depth} | ${formatMs(p.baselineMs)} | ${formatMs(p.currentMs)} | ${formatRatio(cell.cursorRatio)}${mark} | ${formatSpeedup(cell.current.speedup)} |`,
+        )
+      }
+    }
+    lines.push('')
   }
-  if (headlines.length) {
-    lines.push('### Deepest deep-page')
+
+  const walks = matched
+    .filter((m) => m.scenario === 'sequential-walk')
+    .sort((a, b) => a.dialect.localeCompare(b.dialect) || a.label.localeCompare(b.label))
+  if (walks.length) {
+    lines.push('### Sequential-walk')
     lines.push('')
     lines.push('| Dialect | Label | Base | Curr | Δ | vs offset |')
     lines.push('| --- | --- | ---: | ---: | ---: | ---: |')
-    for (const d of headlines) {
+    for (const d of walks) {
       const mark = d.status === 'regression' ? ' ⚠️' : d.status === 'improvement' ? ' ✅' : ''
       lines.push(
         `| ${d.dialect} | ${d.label} | ${formatMs(d.baseline.cursorMean)} | ${formatMs(d.current.cursorMean)} | ${formatRatio(d.cursorRatio)}${mark} | ${formatSpeedup(d.current.speedup)} |`,
