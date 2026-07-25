@@ -156,11 +156,22 @@ jobs:
       contents: write
       pull-requests: write
     steps:
+      # GITHUB_TOKEN cannot bypass "require PR" rulesets. On main, mint an
+      # installation token for a GitHub App that is on the ruleset bypass list
+      # (secrets: BASELINE_APP_ID + BASELINE_APP_PRIVATE_KEY).
+      - name: Create GitHub App token
+        id: app-token
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.BASELINE_APP_ID }}
+          private-key: ${{ secrets.BASELINE_APP_PRIVATE_KEY }}
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # Needed so the baseline-update push can use [skip ci] on main.
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # App token on main so git push can bypass ruleset; GITHUB_TOKEN elsewhere.
+          token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
