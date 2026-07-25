@@ -181,6 +181,9 @@ export const timeBothStrategies = async (opts: {
 /**
  * Fair single-page cursor vs offset sweep at each depth.
  * Cursor tokens are pre-resolved outside the timer; offset uses depth × pageSize.
+ *
+ * Depths are measured in ascending order and the keyset walk is continued between
+ * points so setup cost is O(maxDepth) pages, not O(sum(depths)).
  */
 export const runDepthSweep = async (opts: {
   ctx: ScenarioContext
@@ -195,18 +198,37 @@ export const runDepthSweep = async (opts: {
   const samples: Sample[] = []
   const labels: string[] = []
 
-  for (const depth of depths) {
+  // Ascending depths so we can continue the keyset walk between points.
+  const ordered = [...depths].sort((a, b) => a - b)
+  let token: string | undefined
+  let atDepth = 0
+
+  for (const depth of ordered) {
     const label = `depth=${depth}`
     labels.push(label)
     process.stdout.write(`    ${logPrefix} ${label}…\n`)
 
-    const token = await resolveCursorAtDepth(handle.paginator, query, sorts, pageSize, depth)
+    while (atDepth < depth) {
+      const page = await handle.paginator.paginate({
+        query: query(),
+        sorts: sorts as any,
+        limit: pageSize,
+        cursor: token ? { nextPage: token } : undefined,
+      })
+      if (!page.nextPage) {
+        throw new Error(`Ran out of pages resolving ${logPrefix} depth=${depth} (stopped at ${atDepth})`)
+      }
+      token = page.nextPage
+      atDepth++
+    }
+
     const offset = depth * pageSize
+    const pageToken = token
 
     const batch = await timeBothStrategies({
       ctx,
       label,
-      cursorFn: () => fetchCursorPage(handle.paginator, query, sorts, pageSize, token),
+      cursorFn: () => fetchCursorPage(handle.paginator, query, sorts, pageSize, pageToken),
       offsetFn: () => fetchOffsetPage(handle.paginator, query, sorts, pageSize, offset),
     })
     samples.push(...batch)

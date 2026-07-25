@@ -36,53 +36,61 @@ pnpm build          # build kysely-cursor so the workspace package resolves
 ## Run
 
 ```bash
-# all dialects, 50k rows (needs Docker) — CI default shape
+# CI profile (default): deep-page + sequential-walk, sparse depths — needs Docker for remote DBs
 pnpm bench
 
-# fast smoke (10k rows, fewer iterations) — good first run
+# fast smoke (10k rows, fewer iterations)
 pnpm bench:quick
 
 # single dialect
 pnpm bench:sqlite
 pnpm bench:postgres
 
-# heavier local run (old-style volume)
+# full poster matrix (all scenarios, dense depths)
+pnpm bench -- --full
+
+# even heavier local run
 pnpm --filter kysely-cursor-bench bench -- \
-  --rows 200000 --depths 0,10,50,100,500,1000,2000,4000 --walk-pages 150 --iterations 12
+  --full --rows 200000 --depths 0,10,50,100,500,1000,2000,4000 --walk-pages 150 --iterations 12
 
 # fine-grained knobs
-pnpm --filter kysely-cursor-bench bench -- --dialect postgres,sqlite --rows 50000 --depths 0,10,100,500
+pnpm --filter kysely-cursor-bench bench -- --dialect postgres,sqlite --scenarios all --depths 0,10,100,500
 ```
 
-Defaults are tuned for **CI wall time** (MySQL/MSSQL containers + deep OFFSET dominate). The curve
-still shows cursor staying flat while offset grows; use the heavier flags above for poster numbers.
+**Default profile** is what CI runs: only the high-SNR scenarios that feed the regression
+gate (`deep-page`, `sequential-walk`), depths `0,100,500`, walk 25, iters 4/1. Secondary
+scenarios (filtered-feed, author-timeline, scoreboard, ideal-baseline) stay available via
+`--full` or `--scenarios …` but are skipped on PRs to keep wall time near ~30s per dialect
+(MSSQL is often higher solely due to container startup).
 
 ### CLI flags
 
-| Flag                | Default                                       | Description                                    |
-| ------------------- | --------------------------------------------- | ---------------------------------------------- |
-| `--dialect`         | all                                           | Comma-separated: `postgres,mysql,mssql,sqlite` |
-| `--rows`            | `50000` (`10000` with `--quick`)              | Seed size                                      |
-| `--page-size`       | `25`                                          | Rows per page                                  |
-| `--depths`          | `0,10,50,100,500,1000` (quick: `0,10,50,200`) | Deep-page depths (0-based); clipped to dataset |
-| `--walk-pages`      | `40` (`15` with `--quick`)                    | Sequential-walk length                         |
-| `--iterations`      | `6` (`3` with `--quick`)                      | Timed iterations per cell                      |
-| `--warmup`          | `2` (`1` with `--quick`)                      | Untimed warmup iterations                      |
-| `--out`             | `./bench/results`                             | Ephemeral report output directory              |
-| `--quick`           | off                                           | Smaller dataset / fewer iterations             |
-| `--compare`         | off                                           | Diff vs committed baseline after the run       |
-| `--update-baseline` | off                                           | Write `bench/baseline/` (committed snapshot)   |
+| Flag                | Default / profile                                             | Description                                    |
+| ------------------- | ------------------------------------------------------------- | ---------------------------------------------- |
+| `--dialect`         | all                                                           | Comma-separated: `postgres,mysql,mssql,sqlite` |
+| `--scenarios`       | `deep-page,sequential-walk` (`all` with `--full`)             | Scenario list, or `all`                        |
+| `--rows`            | `50000` (`10000` with `--quick`)                              | Seed size                                      |
+| `--page-size`       | `25`                                                          | Rows per page                                  |
+| `--depths`          | `0,100,500` (full: `0,10,50,100,500,1000`; quick: `0,50,200`) | Deep-page depths (0-based); clipped to dataset |
+| `--walk-pages`      | `25` (full: `40`; quick: `15`)                                | Sequential-walk length                         |
+| `--iterations`      | `4` (full: `6`; quick: `3`)                                   | Timed iterations per cell                      |
+| `--warmup`          | `1` (full: `2`)                                               | Untimed warmup iterations                      |
+| `--out`             | `./bench/results`                                             | Ephemeral report output directory              |
+| `--quick`           | off                                                           | Smoke: smaller seed / fewer iters              |
+| `--full`            | off                                                           | All scenarios + dense depths (poster matrix)   |
+| `--compare`         | off                                                           | Diff vs committed baseline after the run       |
+| `--update-baseline` | off                                                           | Write `bench/baseline/` (committed snapshot)   |
 
 ## Scenarios
 
-| Scenario            | What it models                                                   | Why it matters                                                     |
-| ------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------ |
-| **deep-page**       | Library page at depth N (`cursor: { nextPage }` vs `{ offset }`) | Primary library comparison; tokens pre-resolved outside the timer  |
-| **sequential-walk** | Infinite scroll / crawl of N consecutive pages                   | End-to-end chained cost                                            |
-| **filtered-feed**   | `WHERE status = 'published'` product listing                     | Selective filter + composite index                                 |
-| **author-timeline** | `WHERE author_id = ?` profile feed                               | Selective secondary key + deep paging                              |
-| **scoreboard**      | `ORDER BY score DESC, id DESC` ranking                           | Non-time secondary sort + `(score, id)` index                      |
-| **ideal-baseline**  | Raw keyset SQL matching the dialect’s library emission           | Codec/wrapper ceiling — not a generic “textbook” shape on every DB |
+| Scenario            | CI default | What it models                                                   | Why it matters                                                     |
+| ------------------- | :--------: | ---------------------------------------------------------------- | ------------------------------------------------------------------ |
+| **deep-page**       |     ✅     | Library page at depth N (`cursor: { nextPage }` vs `{ offset }`) | Primary library comparison; tokens pre-resolved outside the timer  |
+| **sequential-walk** |     ✅     | Infinite scroll / crawl of N consecutive pages                   | End-to-end chained cost                                            |
+| **filtered-feed**   |  `--full`  | `WHERE status = 'published'` product listing                     | Selective filter + composite index                                 |
+| **author-timeline** |  `--full`  | `WHERE author_id = ?` profile feed                               | Selective secondary key + deep paging                              |
+| **scoreboard**      |  `--full`  | `ORDER BY score DESC, id DESC` ranking                           | Non-time secondary sort + `(score, id)` index                      |
+| **ideal-baseline**  |  `--full`  | Raw keyset SQL matching the dialect’s library emission           | Codec/wrapper ceiling — not a generic “textbook” shape on every DB |
 
 ### What SQL the library emits (timed scenarios)
 
@@ -218,14 +226,20 @@ pnpm bench:compare
 pnpm bench -- --compare --fail-on-regression --threshold 1.5
 ```
 
-A **regression** is any matched cell whose **cursor mean** is ≥ `threshold`× the
-baseline (default **1.5**). The primary signal is library keyset latency, not
-offset (engine behavior we do not control).
+A **regression** (report row) is any matched cell whose **cursor mean** is
+≥ `threshold`× the baseline (default **1.5**). The primary signal is library
+keyset latency, not offset (engine behavior we do not control).
 
-**CI gating** (`--fail-on-regression`) only fails the job for library scenarios at
-**depth ≥ 100** or sequential **walk** cells. Shallow depths and `ideal-baseline`
-(raw SQL ceiling) still appear in the report as informational — runner noise often
-dominates sub-ms cells.
+**CI gating** (`--fail-on-regression`) fails the job only when **all** hold:
+
+1. Scenario is **`deep-page`** or **`sequential-walk`** (other library scenarios stay informational)
+2. **depth ≥ 100** or a **walk** label (`walk=…`)
+3. Cursor-mean ratio ≥ `threshold` (default **1.5×**)
+4. Absolute slowdown ≥ dialect floor: **2ms** for postgres/mysql/mssql, **0.5ms** for sqlite
+
+Ratio spikes below the absolute floor, shallow depths, and secondary scenarios
+(scoreboard, filtered-feed, author-timeline, ideal-baseline) stay under
+**Noisy / weak** and do not red the job.
 
 | Flag                   | Meaning                                                          |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -234,7 +248,7 @@ dominates sub-ms cells.
 | `--merge <path[,…]>`   | Merge partial baseline JSON files or dirs (CI matrix); skips run |
 | `--baseline <path>`    | Baseline JSON (default `bench/baseline/results.json`)            |
 | `--threshold <n>`      | Cursor-mean ratio that counts as a regression                    |
-| `--fail-on-regression` | Exit 1 on CI-gating regressions (see above)                      |
+| `--fail-on-regression` | Exit 1 on CI-gating regressions (ratio **and** abs Δ floor)      |
 | `--comment-out <path>` | Write the compare markdown (for PR comments)                     |
 | `--update-baseline`    | Write `bench/baseline/{results.json,summary.md}`                 |
 | `--git-sha <sha>`      | Embed SHA in the JSON (CI sets this from `GITHUB_SHA`)           |
@@ -248,12 +262,11 @@ comparable to Actions runners.
 Benchmarks run as a **dialect matrix** in `.github/workflows/ci.yml`
 (`postgres`, `mysql`, `mssql`, `sqlite` in parallel):
 
-1. Each **Bench (dialect)** job builds the library, runs that dialect only
-   (same seed/page/depth config as the committed baseline), and diffs its cells
-   against `bench/baseline/results.json` (compare scopes to dialects present in
-   the current run). The job fails on **CI-gating** cursor-mean regressions ≥ 1.5×
-   (library path, depth ≥ 100 or walks) when the baseline was produced on CI
-   (`gitSha` set).
+1. Each **Bench (dialect)** job builds the library and runs the **CI profile**
+   (default CLI: deep-page + sequential-walk, depths 0/100/500, walk 25, iters 4/1)
+   for that dialect only, then diffs cells against `bench/baseline/results.json`.
+   The job fails on **CI-gating** regressions (≥ 1.5× **and** ≥ abs ms floor on
+   deep/walk cells) when the baseline was produced on CI (`gitSha` set).
 2. **Bench report** downloads all dialect artifacts, merges them with
    `--merge bench/artifacts`, and:
    - On **pull_request**: posts a sticky PR comment with the combined compare report.
@@ -274,7 +287,7 @@ pnpm --filter kysely-cursor-bench bench -- \
 
 - **Speedup** = `offset.mean / cursor.mean` (higher ⇒ cursor faster).
 - **Δ ms** = `offset.mean − cursor.mean` (positive ⇒ cursor faster).
-- Absolute ms depends on machine and container RTT; **baseline ratios on CI** are the regression signal.
+- Absolute ms depends on machine and container RTT; **CI uses ratio + absolute Δ floor** against the committed baseline.
 - Page 0 is often similar for both strategies (no skip). The gap opens as depth grows.
 - Compare **within a dialect**, not absolute ms across Postgres vs SQLite (containers vs in-process).
 

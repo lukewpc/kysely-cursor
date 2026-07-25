@@ -26,6 +26,7 @@ Usage:
 
 Run options:
   --dialect <name[,name…]>   postgres | mysql | mssql | sqlite  (default: all)
+  --scenarios <id[,…]|all>   default: deep-page,sequential-walk  (CI); all with --full
   --rows <n>                 rows to seed                       (default: 50000, quick: 10000)
   --page-size <n>            page size                          (default: 25)
   --depths <n,n,…>           deep-page depths (0-based)
@@ -33,7 +34,8 @@ Run options:
   --iterations <n>           timed iterations per measurement
   --warmup <n>               warmup iterations
   --out <dir>                ephemeral results directory        (default: ./bench/results)
-  --quick                    smaller dataset / fewer iterations
+  --quick                    smoke: smaller seed / fewer iters
+  --full                     poster matrix: all scenarios, dense depths
   --update-baseline          write slim results to bench/baseline/ (skipped if compare failed)
   --baseline-dir <dir>       baseline directory                 (default: ./bench/baseline)
   --git-sha <sha>            record SHA into baseline JSON
@@ -42,12 +44,14 @@ Run options:
   --merge <path[,path…]>     merge partial baseline JSON files or dirs (CI matrix); implies --compare; skips run
   --baseline <path>          baseline JSON path                 (default: bench/baseline/results.json)
   --threshold <n>            cursor-mean regression ratio       (default: 1.5)
-  --fail-on-regression       exit 1 if any cell ≥ threshold
+  --fail-on-regression       exit 1 on CI-gating regressions (ratio + abs Δ floor)
   --comment-out <path>       write compare markdown to path (for PR comments)
   --help                     show this help
 
 Examples:
-  pnpm bench --quick
+  pnpm bench                     # CI profile (deep-page + walk, sparse depths)
+  pnpm bench --quick             # faster smoke
+  pnpm bench --full              # all scenarios, dense depths
   pnpm bench --update-baseline
   pnpm bench --dialect postgres,sqlite --compare --fail-on-regression
   pnpm bench --compare --current bench/results/latest-results.json
@@ -245,7 +249,8 @@ const runCompare = async (opts: {
     const n = gatingRegressions(result).length
     console.error(
       `\nBenchmark regression: ${n} CI-gating cell(s) ≥ ${opts.threshold}× baseline cursor mean ` +
-        `(library path, depth ≥ 100 or walks; ideal-baseline / shallow depths ignored).`,
+        `and ≥ dialect abs floor (2ms remote / 0.5ms sqlite; deep-page / sequential-walk only, ` +
+        `depth ≥ 100 or walks; other scenarios / shallow / sub-floor Δ ignored).`,
     )
     process.exitCode = 1
   }
