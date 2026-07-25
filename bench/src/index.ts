@@ -20,7 +20,7 @@ Usage:
 
 Run options:
   --dialect <name[,name…]>   postgres | mysql | mssql | sqlite  (default: all)
-  --rows <n>                 rows to seed                       (default: 200000, quick: 20000)
+  --rows <n>                 rows to seed                       (default: 50000, quick: 10000)
   --page-size <n>            page size                          (default: 25)
   --depths <n,n,…>           deep-page depths (0-based)
   --walk-pages <n>           sequential-walk page count

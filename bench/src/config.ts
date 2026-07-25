@@ -46,11 +46,13 @@ export const parseArgs = (argv: string[]): BenchConfig => {
     throw new Error(`No valid dialects. Choose from: ${ALL_DIALECTS.join(', ')}`)
   }
 
-  const rowCount = num(get('--rows'), quick ? 20_000 : 200_000)
+  // Full suite is sized for CI-friendly wall time on MySQL/MSSQL containers while
+  // still showing cursor vs offset divergence at depth. Use flags for heavier local runs.
+  const rowCount = num(get('--rows'), quick ? 10_000 : 50_000)
   const pageSize = num(get('--page-size'), 25)
-  const iterations = num(get('--iterations'), quick ? 5 : 12)
-  const warmup = num(get('--warmup'), quick ? 1 : 3)
-  const walkPages = num(get('--walk-pages'), quick ? 40 : 150)
+  const iterations = num(get('--iterations'), quick ? 3 : 6)
+  const warmup = num(get('--warmup'), quick ? 1 : 2)
+  const walkPages = num(get('--walk-pages'), quick ? 15 : 40)
 
   const depthsArg = get('--depths')
   const deepPageDepths = depthsArg
@@ -59,8 +61,8 @@ export const parseArgs = (argv: string[]): BenchConfig => {
         .map((s) => Number(s.trim()))
         .filter((n) => Number.isFinite(n) && n >= 0)
     : quick
-      ? [0, 10, 50, 200, 400]
-      : [0, 10, 50, 100, 500, 1000, 2000, 4000]
+      ? [0, 10, 50, 200]
+      : [0, 10, 50, 100, 500, 1000]
 
   // drop depths that would exceed the dataset
   const maxDepth = Math.max(0, Math.floor(rowCount / pageSize) - 1)
