@@ -14,7 +14,7 @@ describe('PostgreSQL pagination helper', () => {
   let db: Kysely<TestDB>
 
   const config: DatabaseConfig = {
-    dialect: PostgresPaginationDialect,
+    dialect: new PostgresPaginationDialect(),
     createTable: async (db) => {
       await db.schema
         .createTable('users')
@@ -27,14 +27,6 @@ describe('PostgreSQL pagination helper', () => {
     },
     insertTestData: async (db, rows) => {
       await db.insertInto('users').values(rows).execute()
-    },
-    applySortToQuery: (query, sorts) => {
-      for (const s of sorts) {
-        const dir = s.dir ?? 'asc'
-        // Reproduce PostgresStrategy's NULLS behavior for parity with MSSQL
-        query = query.orderBy(s.col, (o: any) => (dir === 'asc' ? o.asc().nullsFirst() : o.desc().nullsLast()))
-      }
-      return query
     },
   }
 
@@ -58,5 +50,5 @@ describe('PostgreSQL pagination helper', () => {
     await pg?.stop().catch(() => {})
   })
 
-  runSharedTests(() => createTestHelpers(db, config), 'postgres')
+  runSharedTests(() => createTestHelpers(db, config), 'postgres', config.dialect.meta)
 })

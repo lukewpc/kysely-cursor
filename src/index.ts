@@ -7,19 +7,20 @@ export { stashCodec } from './codec/stash.js'
 export { superJsonCodec } from './codec/superJson.js'
 
 // dialects
+export { BasePaginationDialect } from './dialect/base.js'
 export { MssqlPaginationDialect } from './dialect/mssql.js'
 export { MysqlPaginationDialect } from './dialect/mysql.js'
 export { PostgresPaginationDialect } from './dialect/postgres.js'
 export { SqlitePaginationDialect } from './dialect/sqlite.js'
 
 // cursor
-export { baseApplyCursor, buildCursorPredicateRecursive, CursorIncoming, EdgeOutgoing } from './cursor.js'
+export { buildCursorPredicateRecursive, CursorIncoming, EdgeOutgoing } from './cursor.js'
 
 // error
 export { ErrorCode, PaginationError } from './error.js'
 
 // paginator
-export { createPaginator, paginateWithEdges } from './paginator.js'
+export { createPaginator, paginate, paginateWithEdges } from './paginator.js'
 export type {
   PaginateArgs,
   PaginatedResult,

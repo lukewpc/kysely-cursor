@@ -1,7 +1,7 @@
 import { base64UrlCodec } from './codec/base64Url.js'
 import { codecPipe } from './codec/codec.js'
 import { superJsonCodec } from './codec/superJson.js'
-import { decodeCursor, resolveEdges, resolvePageTokens, sortSignature } from './cursor.js'
+import { decodeCursor, invertNulls, resolveEdges, resolvePageTokens, sortSignature } from './cursor.js'
 import { PaginationError } from './error.js'
 import type { SortSet } from './sorting.js'
 import { applyDefaultDirection } from './sorting.js'
@@ -100,4 +100,8 @@ const invertSorts = <S extends SortSet<any, any, any>>(sorts: S): S =>
   sorts.map((s) => ({
     ...s,
     dir: applyDefaultDirection(s.dir) === 'desc' ? 'asc' : 'desc',
+    // explicit null placement must also flip so the inverted ORDER BY is the exact
+    // reverse of the forward order (e.g. ASC NULLS LAST reverses to DESC NULLS FIRST).
+    // when unset, placement is derived from the (inverted) direction, so leave it undefined.
+    nulls: s.nulls ? invertNulls(s.nulls) : undefined,
   })) as unknown as S

@@ -14,7 +14,7 @@ describe('MSSQL pagination helper', () => {
   let db: Kysely<TestDB>
 
   const config: DatabaseConfig = {
-    dialect: MssqlPaginationDialect,
+    dialect: new MssqlPaginationDialect(),
     createTable: async (db) => {
       await sql`
         CREATE TABLE users (
@@ -28,14 +28,6 @@ describe('MSSQL pagination helper', () => {
     },
     insertTestData: async (db, rows) => {
       await db.insertInto('users').values(rows).execute()
-    },
-    applySortToQuery: (query, sorts) => {
-      for (const s of sorts) {
-        const dir = s.dir ?? 'asc'
-        // MSSQL's default NULLS behavior: NULLS FIRST for ASC, NULLS LAST for DESC
-        query = query.orderBy(s.col as any, dir)
-      }
-      return query
     },
   }
 
@@ -86,5 +78,5 @@ describe('MSSQL pagination helper', () => {
     await mssql?.stop().catch(() => {})
   })
 
-  runSharedTests(() => createTestHelpers(db, config), 'mssql')
+  runSharedTests(() => createTestHelpers(db, config), 'mssql', config.dialect.meta)
 })

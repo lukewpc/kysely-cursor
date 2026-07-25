@@ -4,7 +4,7 @@ import { base64UrlCodec } from '~/codec/base64Url.js'
 import { codecPipe } from '~/codec/codec.js'
 import { superJsonCodec } from '~/codec/superJson.js'
 import * as cursorModule from '~/cursor.js'
-import { decodeCursor, resolveCursor, sortSignature } from '~/cursor.js'
+import { buildCursorPredicateRecursive, CURSOR_VERSION, decodeCursor, resolveCursor, sortSignature } from '~/cursor.js'
 import { PaginationError } from '~/error.js'
 import { paginate, paginateWithEdges } from '~/paginator.js'
 import type { SortSet } from '~/sorting.js'
@@ -46,6 +46,10 @@ function makeBuilder<DB, TB extends keyof DB, O>(rows: O[]): SelectQueryBuilder<
 }
 
 const TestDialect: PaginationDialect = {
+  meta: {
+    supportsNullSortDirective: true,
+    defaultNullsSortAsc: 'last',
+  },
   applyLimit: (builder, limit) => ((builder as any).limit ? (builder as any).limit(limit) : builder),
   applyOffset: (builder) => builder,
   applySort: (builder, sorts) =>
@@ -108,6 +112,49 @@ describe('paginate (runtime)', () => {
 
   it('throws on invalid cursor', async () => {
     await expect(decodeCursor({ invalid: 'invalid' } as any, cursorCodec)).rejects.toThrow(/Invalid cursor/i)
+  })
+})
+
+describe('input validation', () => {
+  it('rejects non-integer and non-positive limits as INVALID_LIMIT', async () => {
+    const builder = makeBuilder<DB, 'users', UserRow>([])
+    for (const limit of [0, -1, 2.5, Number.NaN]) {
+      await expect(
+        paginate({
+          query: builder,
+          sorts: validSortsQualifiedOnly,
+          limit,
+          dialect: TestDialect,
+        }),
+      ).rejects.toMatchObject({ code: 'INVALID_LIMIT', message: 'Invalid page size limit' })
+    }
+  })
+
+  it('rejects negative and non-integer offsets as INVALID_TOKEN', async () => {
+    for (const offset of [-1, 1.5, Number.NaN]) {
+      await expect(decodeCursor({ offset }, cursorCodec)).rejects.toMatchObject({
+        code: 'INVALID_TOKEN',
+        message: 'Invalid pagination offset',
+      })
+    }
+  })
+
+  it('accepts zero and positive integer offsets', async () => {
+    await expect(decodeCursor({ offset: 0 }, cursorCodec)).resolves.toEqual({ type: 'offset', offset: 0 })
+    await expect(decodeCursor({ offset: 42 }, cursorCodec)).resolves.toEqual({ type: 'offset', offset: 42 })
+  })
+
+  it('surfaces invalid offsets from paginate as INVALID_TOKEN, not UNEXPECTED_ERROR', async () => {
+    const builder = makeBuilder<DB, 'users', UserRow>([])
+    await expect(
+      paginate({
+        query: builder,
+        sorts: validSortsQualifiedOnly,
+        limit: 5,
+        cursor: { offset: -3 },
+        dialect: TestDialect,
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_TOKEN', message: 'Invalid pagination offset' })
   })
 })
 
@@ -281,5 +328,231 @@ describe('paginateWithEdges (runtime)', () => {
         cursorCodec,
       }),
     ).rejects.toThrow(paginationError)
+  })
+})
+
+describe('null-aware sorting', () => {
+  it('includes nulls directive in sortSignature', () => {
+    const sortsNullsFirst: SortSet<DB, 'users', UserRow> = [
+      { col: 'users.created_at', dir: 'asc', nulls: 'first' },
+      { col: 'users.id', dir: 'asc' },
+    ]
+    const sortsNullsLast: SortSet<DB, 'users', UserRow> = [
+      { col: 'users.created_at', dir: 'asc', nulls: 'last' },
+      { col: 'users.id', dir: 'asc' },
+    ]
+
+    const sigFirst = sortSignature(sortsNullsFirst)
+    const sigLast = sortSignature(sortsNullsLast)
+
+    expect(sigFirst).not.toEqual(sigLast)
+  })
+
+  it('builds predicate for a NULL cursor value when nulls come first', () => {
+    const sorts: SortSet<DB, 'users', UserRow> = [
+      { col: 'users.name', dir: 'asc', nulls: 'first' },
+      { col: 'users.id', dir: 'asc' },
+    ]
+
+    const decoded = {
+      v: CURSOR_VERSION,
+      sig: sortSignature(sorts),
+      k: {
+        name: null,
+        id: 10,
+      },
+    }
+
+    const eb: any = (col: any, op: any, value: any) => ({ type: 'cmp', col, op, value })
+    eb.and = (parts: any[]) => ({ type: 'and', parts })
+    eb.or = (parts: any[]) => ({ type: 'or', parts })
+
+    const predicate = buildCursorPredicateRecursive(eb, sorts, decoded, TestDialect.meta)
+
+    expect(predicate).toMatchObject({
+      type: 'or',
+      parts: [
+        {
+          type: 'and',
+          parts: [
+            {
+              type: 'cmp',
+              col: 'users.name',
+              op: 'is',
+              value: null,
+            },
+            {
+              type: 'or',
+              parts: [
+                {
+                  type: 'and',
+                  parts: [
+                    {
+                      type: 'cmp',
+                      col: 'users.id',
+                      op: 'is not',
+                      value: null,
+                    },
+                    {
+                      type: 'cmp',
+                      col: 'users.id',
+                      op: '>',
+                      value: 10,
+                    },
+                  ],
+                },
+                {
+                  type: 'cmp',
+                  col: 'users.id',
+                  op: 'is',
+                  value: null,
+                },
+              ],
+            },
+          ],
+        },
+        {
+          type: 'cmp',
+          col: 'users.name',
+          op: 'is not',
+          value: null,
+        },
+      ],
+    })
+  })
+
+  it('builds predicate for a NULL cursor value when nulls come last', () => {
+    const sorts: SortSet<DB, 'users', UserRow> = [
+      { col: 'users.name', dir: 'asc', nulls: 'last' },
+      { col: 'users.id', dir: 'asc' },
+    ]
+
+    const decoded = {
+      v: CURSOR_VERSION,
+      sig: sortSignature(sorts),
+      k: {
+        name: null,
+        id: 10,
+      },
+    }
+
+    const eb: any = (col: any, op: any, value: any) => ({ type: 'cmp', col, op, value })
+    eb.and = (parts: any[]) => ({ type: 'and', parts })
+    eb.or = (parts: any[]) => ({ type: 'or', parts })
+
+    const predicate = buildCursorPredicateRecursive(eb, sorts, decoded, TestDialect.meta)
+
+    expect(predicate).toMatchObject({
+      type: 'and',
+      parts: [
+        {
+          type: 'cmp',
+          col: 'users.name',
+          op: 'is',
+          value: null,
+        },
+        {
+          type: 'or',
+          parts: [
+            {
+              type: 'and',
+              parts: [
+                {
+                  type: 'cmp',
+                  col: 'users.id',
+                  op: 'is not',
+                  value: null,
+                },
+                {
+                  type: 'cmp',
+                  col: 'users.id',
+                  op: '>',
+                  value: 10,
+                },
+              ],
+            },
+            {
+              type: 'cmp',
+              col: 'users.id',
+              op: 'is',
+              value: null,
+            },
+          ],
+        },
+      ],
+    })
+  })
+
+  it('rejects a NULL value on the final sort key', () => {
+    const sorts: SortSet<DB, 'users', UserRow> = [
+      { col: 'users.name', dir: 'asc', nulls: 'first' },
+      { col: 'users.id', dir: 'asc' },
+    ]
+
+    const decoded = {
+      v: CURSOR_VERSION,
+      sig: sortSignature(sorts),
+      k: {
+        name: 'Alpha',
+        id: null, // final sort must be non-nullable — token is malformed/tampered
+      },
+    }
+
+    const eb: any = (col: any, op: any, value: any) => ({ type: 'cmp', col, op, value })
+    eb.and = (parts: any[]) => ({ type: 'and', parts })
+    eb.or = (parts: any[]) => ({ type: 'or', parts })
+
+    expect(() => buildCursorPredicateRecursive(eb, sorts, decoded, TestDialect.meta)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_TOKEN' }),
+    )
+  })
+})
+
+describe('cursor token hygiene', () => {
+  it('classifies undecodable tokens as INVALID_TOKEN', async () => {
+    await expect(decodeCursor({ nextPage: '!!!not-a-token!!!' }, cursorCodec)).rejects.toMatchObject({
+      code: 'INVALID_TOKEN',
+    })
+  })
+
+  it('classifies decodable but malformed payloads as INVALID_TOKEN', async () => {
+    const token = await cursorCodec.encode({ hello: 'world' })
+    await expect(decodeCursor({ nextPage: token }, cursorCodec)).rejects.toMatchObject({
+      code: 'INVALID_TOKEN',
+      message: 'Invalid page token',
+    })
+  })
+
+  it('rejects tokens from an incompatible cursor version loudly', async () => {
+    const sorts = validSortsQualifiedOnly
+    const payload = { ...resolveCursor({ id: 1, created_at: new Date() } as any, sorts), v: 999 }
+    const token = await cursorCodec.encode(payload)
+
+    await expect(decodeCursor({ nextPage: token }, cursorCodec)).rejects.toMatchObject({
+      code: 'INVALID_TOKEN',
+      message: 'Unsupported cursor version: 999',
+    })
+  })
+
+  it('rejects legacy tokens without a version field', async () => {
+    const sorts = validSortsQualifiedOnly
+    const payload: any = resolveCursor({ id: 1, created_at: new Date() } as any, sorts)
+    delete payload.v // simulate a token minted before versioning existed
+    const token = await cursorCodec.encode(payload)
+
+    await expect(decodeCursor({ nextPage: token }, cursorCodec)).rejects.toMatchObject({
+      code: 'INVALID_TOKEN',
+      message: 'Invalid page token',
+    })
+  })
+
+  it('round-trips payloads including the version field', async () => {
+    const sorts = validSortsQualifiedOnly
+    const payload = resolveCursor({ id: 1, created_at: new Date('2023-01-01T00:00:00Z') } as any, sorts)
+    expect(payload.v).toBe(CURSOR_VERSION)
+
+    const token = await cursorCodec.encode(payload)
+    const decoded = await decodeCursor({ nextPage: token }, cursorCodec)
+    expect(decoded).toMatchObject({ type: 'next', payload: { v: CURSOR_VERSION, sig: payload.sig } })
   })
 })

@@ -10,16 +10,17 @@ describe('SQLite pagination helper', () => {
   let db: Kysely<TestDB>
 
   const config: DatabaseConfig = {
-    dialect: SqlitePaginationDialect,
+    dialect: new SqlitePaginationDialect(),
     createTable: async (db) => {
       await sql`
-        CREATE TABLE users (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL,
-          created_at TEXT NOT NULL,
-          rating INTEGER NULL,
-          active INTEGER NOT NULL DEFAULT 1
-        )
+          CREATE TABLE users
+          (
+              id         INTEGER PRIMARY KEY AUTOINCREMENT,
+              name       TEXT    NOT NULL,
+              created_at TEXT    NOT NULL,
+              rating     INTEGER NULL,
+              active     INTEGER NOT NULL DEFAULT 1
+          )
       `.execute(db)
     },
     insertTestData: async (db, rows) => {
@@ -36,13 +37,6 @@ describe('SQLite pagination helper', () => {
           ),
         )
         .execute()
-    },
-    applySortToQuery: (query, sorts) => {
-      for (const s of sorts) {
-        const dir = s.dir ?? 'asc'
-        query = query.orderBy(s.col, dir)
-      }
-      return query
     },
   }
 
@@ -76,5 +70,5 @@ describe('SQLite pagination helper', () => {
     }
   }
 
-  runSharedTests(createCoercingHelpers, 'sqlite')
+  runSharedTests(createCoercingHelpers, 'sqlite', config.dialect.meta)
 })
