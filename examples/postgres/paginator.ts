@@ -34,7 +34,7 @@ export function createAppPaginator(options?: {
    * every non-final sort is `nullable: false` and directions are uniform.
    * Use `portable` to force plain multi-column OR instead.
    */
-  keysetStrategy?: 'auto' | 'portable' | 'seek'
+  keysetStrategy?: 'auto' | 'portable'
 }): Paginator {
   const cursorCodec = options?.secret
     ? createEncryptedCursorCodec(options.secret)

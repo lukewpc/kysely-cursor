@@ -191,8 +191,9 @@ bench/baseline/
   summary.md     # human-readable snapshot of that baseline
 ```
 
-These are updated automatically on **push to `main`** by `.github/workflows/ci.yml`.
-That gives you per-commit visibility: `git show <sha>:bench/baseline/results.json`.
+These are updated automatically on **successful** pushes to `main` by `.github/workflows/ci.yml`
+(regression or runner failure leaves the previous baseline in place). That gives you
+per-commit visibility: `git show <sha>:bench/baseline/results.json`.
 
 Refresh locally after a full run you trust:
 

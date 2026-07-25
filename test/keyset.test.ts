@@ -173,13 +173,6 @@ describe('selectKeysetStrategy', () => {
       expected: 'row_compare',
     },
     {
-      name: 'seek + pg + uniform → row_compare',
-      class_: simpleDesc,
-      meta: pgMeta,
-      opt: 'seek',
-      expected: 'row_compare',
-    },
-    {
       name: 'portable never row_compare',
       class_: simpleDesc,
       meta: pgMeta,
@@ -199,24 +192,10 @@ describe('selectKeysetStrategy', () => {
       expected: 'plain_or',
     },
     {
-      name: 'seek on mssql falls back to plain_or',
-      class_: simpleDesc,
-      meta: mssqlMeta,
-      opt: 'seek',
-      expected: 'plain_or',
-    },
-    {
       name: 'mysql stays on null_safe_or even for simple_non_null',
       class_: simpleDesc,
       meta: mysqlMeta,
       opt: 'auto',
-      expected: 'null_safe_or',
-    },
-    {
-      name: 'seek on mysql still stays null_safe_or (no row compare capability)',
-      class_: simpleDesc,
-      meta: mysqlMeta,
-      opt: 'seek',
       expected: 'null_safe_or',
     },
   ]

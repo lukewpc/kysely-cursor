@@ -185,7 +185,6 @@ Optional `keysetStrategy` on the paginator:
 | ---------------- | ------------------------------------------------------------------------ |
 | `auto` (default) | Prefer row compare when class + dialect allow; else plain OR / null-safe |
 | `portable`       | Never emit row compare                                                   |
-| `seek`           | Prefer row compare when allowed; same fallbacks as `auto` (no error)     |
 
 ```ts
 const paginator = createPaginator({
@@ -266,7 +265,7 @@ import { createPaginator, type PaginatorOptions, type Paginator } from 'kysely-c
 const paginator: Paginator = createPaginator({
   dialect, // PaginationDialect
   cursorCodec, // optional: Codec<any, string>; defaults to SuperJSON+Base64URL
-  keysetStrategy, // optional: 'auto' | 'portable' | 'seek'; defaults to 'auto'
+  keysetStrategy, // optional: 'auto' | 'portable'; defaults to 'auto'
 })
 ```
 

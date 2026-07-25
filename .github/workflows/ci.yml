@@ -120,7 +120,8 @@ jobs:
         # Full suite so results match the committed baseline shape/config.
         # --compare diffs against bench/baseline/results.json.
         # --fail-on-regression exits 1 when cursor mean ≥ 1.5× baseline.
-        # Continue so we still post the comment / update baseline on main when noisy.
+        # Continue so we still post the PR comment when noisy; baseline is only
+        # refreshed after a successful run (see steps below).
         id: bench
         continue-on-error: true
         run: >
@@ -130,7 +131,6 @@ jobs:
           --fail-on-regression
           --threshold 1.5
           --comment-out results/pr-comment.md
-          --update-baseline
 
       - name: Upload bench artifacts
         if: always()
@@ -150,14 +150,24 @@ jobs:
           header: kysely-cursor-bench
           path: bench/results/pr-comment.md
 
-      # Always record what main measured (even if the run flagged a regression),
-      # so `git show <sha>:bench/baseline/results.json` reflects that commit.
+      # Only promote a new baseline when the suite passed (no regression / runner error).
+      # A failing main run must not overwrite the regression threshold with worse numbers.
+      - name: Update baseline on main
+        if: >
+          steps.bench.outcome == 'success' &&
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main'
+        run: >
+          pnpm --filter kysely-cursor-bench bench
+          -- --git-sha "${{ github.sha }}"
+          --current results/latest-results.json
+          --update-baseline
+
       - name: Commit updated baseline on main
         if: >
-          always() &&
+          steps.bench.outcome == 'success' &&
           github.event_name == 'push' &&
           github.ref == 'refs/heads/main' &&
-          steps.bench.outcome != 'cancelled' &&
           hashFiles('bench/baseline/results.json') != ''
         run: |
           git config user.name "github-actions[bot]"

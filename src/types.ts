@@ -23,9 +23,8 @@ export type DialectMeta = {
  * - `auto` (default): row compare when the dialect supports it and sorts allow;
  *   otherwise plain multi-column OR. Nullable / null-ordered sorts stay null-safe.
  * - `portable`: never emit row compare (only null-safe OR / plain OR).
- * - `seek`: prefer row compare when class + dialect allow; same fallbacks as `auto`.
  */
-export type KeysetStrategy = 'auto' | 'portable' | 'seek'
+export type KeysetStrategy = 'auto' | 'portable'
 
 export type PaginationDialect = {
   meta: DialectMeta

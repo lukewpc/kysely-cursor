@@ -78,8 +78,7 @@ export const selectKeysetStrategy = (
 ): EmitKind => {
   if (class_.kind === 'null_safe') return 'null_safe_or'
 
-  // `portable` never uses row compare; `auto` and `seek` prefer it when allowed.
-  // `seek` falls back the same way as `auto` when class/dialect forbid it (no error).
+  // `portable` never uses row compare; `auto` prefers it when class + dialect allow.
   const allowRow = opt !== 'portable' && meta.supportsRowValueCompare && class_.uniformDir !== 'mixed'
 
   if (allowRow) return 'row_compare'

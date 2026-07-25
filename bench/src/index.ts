@@ -17,7 +17,7 @@ import {
 import { describeConfig, parseArgs } from './config.js'
 import { renderBaselineMarkdown, renderConsole, writeReports } from './report.js'
 import { runBenchmarks } from './runner.js'
-import type { BaselineReport } from './types.js'
+import type { BaselineReport, BenchReport } from './types.js'
 
 const printHelp = () => {
   console.log(
@@ -39,11 +39,11 @@ Run options:
   --warmup <n>               warmup iterations
   --out <dir>                ephemeral results directory        (default: ./bench/results)
   --quick                    smaller dataset / fewer iterations
-  --update-baseline          write slim results to bench/baseline/ (committed)
+  --update-baseline          write slim results to bench/baseline/ (skipped if compare failed)
   --baseline-dir <dir>       baseline directory                 (default: ./bench/baseline)
   --git-sha <sha>            record SHA into baseline JSON
   --compare                  after run (or with --current), diff vs baseline
-  --current <path>           JSON to treat as current (implies --compare; skips run)
+  --current <path>           JSON to treat as current (implies --compare; skips run; can pair with --update-baseline)
   --baseline <path>          baseline JSON path                 (default: bench/baseline/results.json)
   --threshold <n>            cursor-mean regression ratio       (default: 1.5)
   --fail-on-regression       exit 1 if any cell ≥ threshold
@@ -94,16 +94,35 @@ const main = async () => {
   const commentOut = getFlag(argv, '--comment-out')
   const gitSha = getFlag(argv, '--git-sha') ?? process.env.GITHUB_SHA
 
-  // Compare-only path: no containers / no run.
+  const maybeWriteBaseline = async (baseline: BaselineReport, full?: BenchReport) => {
+    if (!updateBaseline) return
+    // Never promote a baseline from a run that already failed compare / set exitCode.
+    if (process.exitCode) {
+      console.warn(
+        '\nSkipping --update-baseline because the run reported a regression or failure.',
+      )
+      return
+    }
+    const summary = renderBaselineMarkdown(baseline, full)
+    const paths = await writeBaseline(baseline, baselineDir, summary)
+    console.log(`  baseline: ${paths.jsonPath}`)
+    console.log(`  summary:  ${paths.mdPath}`)
+  }
+
+  // Compare / promote-from-existing path: no containers / no run.
   if (currentPath) {
-    const current = await loadBaseline(resolve(currentPath))
-    await runCompare({
-      current,
-      baselinePath,
-      threshold,
-      failOnRegression,
-      commentOut,
-    })
+    let current = await loadBaseline(resolve(currentPath))
+    if (gitSha) current = { ...current, gitSha }
+    if (compareMode) {
+      await runCompare({
+        current,
+        baselinePath,
+        threshold,
+        failOnRegression,
+        commentOut,
+      })
+    }
+    await maybeWriteBaseline(current)
     return
   }
 
@@ -144,12 +163,7 @@ const main = async () => {
     }
   }
 
-  if (updateBaseline) {
-    const summary = renderBaselineMarkdown(baseline, report)
-    const paths = await writeBaseline(baseline, baselineDir, summary)
-    console.log(`  baseline: ${paths.jsonPath}`)
-    console.log(`  summary:  ${paths.mdPath}`)
-  }
+  await maybeWriteBaseline(baseline, report)
 }
 
 const runCompare = async (opts: {
