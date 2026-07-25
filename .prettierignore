@@ -4,3 +4,5 @@ build
 coverage
 pnpm-lock.yaml
 .changeset
+# Machine-written by the bench suite / CI baseline job — do not reformat.
+bench/baseline/

@@ -24,16 +24,23 @@ export function createEncryptedCursorCodec(secret: string) {
 
 /**
  * One paginator per app (or per token policy). Reuse it for every page request —
- * dialect + codec stay fixed; only the query / sorts / cursor change.
+ * dialect + codec + keyset strategy stay fixed; only the query / sorts / cursor change.
  */
 export function createAppPaginator(options?: {
   /** Prefer encrypted tokens when a secret is available. */
   secret?: string
+  /**
+   * `auto` (default) uses Postgres row-value compare `(a, b) < ($1, $2)` when
+   * every non-final sort is `nullable: false` and directions are uniform.
+   * Use `portable` to force plain multi-column OR instead.
+   */
+  keysetStrategy?: 'auto' | 'portable'
 }): Paginator {
   const cursorCodec = options?.secret ? createEncryptedCursorCodec(options.secret) : defaultCursorCodec
 
   return createPaginator({
     dialect: new PostgresPaginationDialect(),
     cursorCodec,
+    keysetStrategy: options?.keysetStrategy ?? 'auto',
   })
 }

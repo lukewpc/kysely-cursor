@@ -15,7 +15,7 @@ The demo code never starts Docker itself; `package.json` owns that boundary so `
 
 ## Prerequisites
 
-- Node.js 18+
+- Node.js 24+
 - Docker with Compose v2 (`docker compose`, including `up --wait`)
 - Dependencies from the monorepo root (`pnpm install`)
 
@@ -68,9 +68,10 @@ DATABASE_URL=postgres://user:pass@localhost:5432/mydb pnpm dev
 
 Also covered in the supporting modules:
 
-- **`nullable: false`** on non-null feed keys for simpler/faster keyset SQL on Postgres
+- **`nullable: false`** on non-null feed keys so Postgres can use row-value compare seeks
 - **Composite indexes** that match sort shapes
 - **Pluggable codecs** — default SuperJSON → Base64URL, optional AES-GCM via `PAGINATION_SECRET`
+- **`keysetStrategy: 'auto'`** (row compare when allowed)
 
 ## Layout
 
@@ -90,9 +91,9 @@ Copy patterns from `paginator.ts` and `demos.ts` into your app; Compose scripts 
 ## Key takeaways
 
 1. **Sorts must uniquely identify rows** — end with a non-null unique key (usually primary key).
-2. **Reuse one paginator** — dialect and codec are app-level; only query / sorts / cursor change per request.
+2. **Reuse one paginator** — dialect, codec, and keyset strategy are app-level; only query / sorts / cursor change per request.
 3. **Match indexes to sorts** — e.g. `(created_at DESC, id DESC)` for the feed.
-4. **Mark non-null leading keys** with `nullable: false` when you want simpler deep-page keyset SQL.
+4. **Mark non-null leading keys** with `nullable: false` when you want seek-friendly SQL on Postgres.
 5. **Keep the same `sorts` array** when following `nextPage` / `prevPage` (tokens include a sort signature).
 6. Prefer keyset over **offset** for deep pages; use offset only for legacy page numbers or shallow admin UIs.
 
