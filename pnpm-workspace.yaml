@@ -1,5 +1,6 @@
 packages:
   - .
+  - bench
   - examples/*
 
 minimumReleaseAge: 1440

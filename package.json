@@ -38,7 +38,13 @@
     "changeset": "changeset",
     "changeset:version": "changeset version",
     "changeset:publish": "changeset publish",
-    "example:postgres": "pnpm --filter kysely-cursor-example-postgres dev"
+    "example:postgres": "pnpm --filter kysely-cursor-example-postgres dev",
+    "bench": "pnpm --filter kysely-cursor-bench bench",
+    "bench:quick": "pnpm --filter kysely-cursor-bench bench:quick",
+    "bench:sqlite": "pnpm --filter kysely-cursor-bench bench:sqlite",
+    "bench:postgres": "pnpm --filter kysely-cursor-bench bench:postgres",
+    "bench:mysql": "pnpm --filter kysely-cursor-bench bench:mysql",
+    "bench:mssql": "pnpm --filter kysely-cursor-bench bench:mssql"
   },
   "keywords": [
     "kysely",

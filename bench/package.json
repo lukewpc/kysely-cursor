@@ -1,0 +1,34 @@
+{
+  "name": "kysely-cursor-bench",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bench": "tsx src/index.ts",
+    "bench:quick": "tsx src/index.ts --quick",
+    "bench:postgres": "tsx src/index.ts --dialect postgres",
+    "bench:mysql": "tsx src/index.ts --dialect mysql",
+    "bench:mssql": "tsx src/index.ts --dialect mssql",
+    "bench:sqlite": "tsx src/index.ts --dialect sqlite"
+  },
+  "dependencies": {
+    "kysely-cursor": "workspace:*",
+    "kysely": "^0.28.8",
+    "better-sqlite3": "^12.4.1",
+    "pg": "^8.11.5",
+    "mysql2": "^3.11.3",
+    "mssql": "^10.0.2",
+    "tarn": "^3.0.2",
+    "tedious": "^18.6.1",
+    "@testcontainers/postgresql": "^11.6.0",
+    "@testcontainers/mysql": "^11.6.0",
+    "@testcontainers/mssqlserver": "^11.6.0",
+    "testcontainers": "^11.6.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^24.7.1",
+    "@types/pg": "^8.15.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.9.3"
+  }
+}

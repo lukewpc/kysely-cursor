@@ -94,6 +94,61 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@24.8.1)(tsx@4.20.6)(yaml@2.8.1)
 
+  bench:
+    dependencies:
+      '@testcontainers/mssqlserver':
+        specifier: ^11.6.0
+        version: 11.7.1
+      '@testcontainers/mysql':
+        specifier: ^11.6.0
+        version: 11.7.1
+      '@testcontainers/postgresql':
+        specifier: ^11.6.0
+        version: 11.7.1
+      better-sqlite3:
+        specifier: ^12.4.1
+        version: 12.4.1
+      kysely:
+        specifier: ^0.28.8
+        version: 0.28.8
+      kysely-cursor:
+        specifier: workspace:*
+        version: link:..
+      mssql:
+        specifier: ^10.0.2
+        version: 10.0.4
+      mysql2:
+        specifier: ^3.11.3
+        version: 3.15.2
+      pg:
+        specifier: ^8.11.5
+        version: 8.16.3
+      tarn:
+        specifier: ^3.0.2
+        version: 3.0.2
+      tedious:
+        specifier: ^18.6.1
+        version: 18.6.1
+      testcontainers:
+        specifier: ^11.6.0
+        version: 11.7.1
+    devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.13
+        version: 7.6.13
+      '@types/node':
+        specifier: ^24.7.1
+        version: 24.8.1
+      '@types/pg':
+        specifier: ^8.15.5
+        version: 8.15.5
+      tsx:
+        specifier: ^4.19.2
+        version: 4.20.6
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   examples/postgres:
     dependencies:
       kysely:
