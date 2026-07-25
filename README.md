@@ -179,7 +179,7 @@ The library keeps **one semantic model** of keyset pagination and varies only th
 | Same on MySQL (`nullable: false`)                      | Stays **null-safe OR** (benches: plain OR / row compare regress at depth)         |
 | Mixed sort directions                                  | Plain OR only where allowed; never row compare                                    |
 
-**Defaults stay null-safe.** Mark non-null feed columns with `nullable: false` when you want the seek-friendly path. That flag is a **runtime assertion** (not inferred from TypeScript types); if the column can actually contain NULLs, pages can be wrong.
+**Defaults stay null-safe.** Mark non-null feed columns with `nullable: false` when you want the seek-friendly path. Emission still reads only the runtime flag (TypeScript does not change SQL). When your query result type is accurate, TypeScript also rejects mismatches: `nullable: false` on a `| null` field, or `nullable: true` on a non-null field. If the column can actually contain NULLs despite the types, pages can still be wrong.
 
 Optional `keysetStrategy` on the paginator:
 

@@ -106,20 +106,23 @@ describe('classifyKeyset', () => {
   })
 
   it('forces null_safe when any sort has explicit nulls, even with nullable: false', () => {
-    const sorts: SortSet<DB, 'users', UserRow> = [
+    // Intentional misconfig vs row types: name is string | null, but runtime may still
+    // see nullable: false + nulls and must force the null-safe path.
+    const sorts = [
       { col: 'users.name', dir: 'asc', nullable: false, nulls: 'last' },
       { col: 'users.id', dir: 'asc' },
-    ]
+    ] as unknown as SortSet<DB, 'users', UserRow>
     const payload = payloadFor(sorts, { name: 'A', id: 1 })
 
     expect(classifyKeyset(sorts, payload)).toEqual({ kind: 'null_safe' })
   })
 
   it('forces null_safe when a non-final cursor value is null', () => {
-    const sorts: SortSet<DB, 'users', UserRow> = [
+    // Intentional misconfig: nullable: false on a nullable-typed column with a null cursor value.
+    const sorts = [
       { col: 'users.name', dir: 'asc', nullable: false },
       { col: 'users.id', dir: 'asc' },
-    ]
+    ] as unknown as SortSet<DB, 'users', UserRow>
     const payload = payloadFor(sorts, { name: null, id: 1 })
 
     expect(classifyKeyset(sorts, payload)).toEqual({ kind: 'null_safe' })
