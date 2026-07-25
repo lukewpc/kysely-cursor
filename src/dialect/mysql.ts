@@ -7,8 +7,9 @@ export class MysqlPaginationDialect extends BasePaginationDialect {
   meta = {
     supportsNullSortDirective: false,
     defaultNullsSortAsc: 'first' as const,
-    // MySQL supports row-value comparison; auto uses it for non-null uniform sorts.
-    // If benches show regressions vs plain OR, flip this to false so auto stays portable.
-    supportsRowValueCompare: true,
+    // Benches: null-safe OR seeks well; both plain OR and row compare regress badly
+    // at depth when nullable: false opts out of the null-safe tree. Stay on null_safe_or.
+    supportsRowValueCompare: false,
+    supportsPlainOrKeyset: false,
   }
 }

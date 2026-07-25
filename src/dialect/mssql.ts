@@ -11,6 +11,7 @@ export class MssqlPaginationDialect extends BasePaginationDialect {
     defaultNullsSortAsc: 'first' as const,
     // No portable SQL row-value comparison on MSSQL.
     supportsRowValueCompare: false,
+    supportsPlainOrKeyset: true,
   }
 
   override applyLimit<DB, TB extends keyof DB, O>(

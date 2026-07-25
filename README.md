@@ -170,13 +170,14 @@ const sorts = [
 
 The library keeps **one semantic model** of keyset pagination and varies only the **SQL emission** by sort class and dialect capability.
 
-| Situation                                                                | Emitted shape (DESC example)                                                          |
-| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
-| Default leading sorts (nullable) or explicit `nulls:`                    | Null-safe OR: `(created_at IS NOT NULL AND created_at < $1) OR (… = $1 AND id …)`     |
-| All non-final sorts set `nullable: false`, uniform dir                   | **Plain OR** on all engines: `created_at < $1 OR (created_at = $1 AND id < $2)`       |
-| Same + dialect supports row compare (Postgres, SQLite, MySQL by default) | **Row compare**: `(created_at, id) < ($1, $2)` — often an Index Cond seek on Postgres |
-| Mixed sort directions                                                    | Plain OR only (row compare is not equivalent)                                         |
-| MSSQL                                                                    | Never row compare (no portable tuple `<` / `>`)                                       |
+| Situation                                              | Emitted shape (DESC example)                                                      |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| Default leading sorts (nullable) or explicit `nulls:`  | Null-safe OR: `(created_at IS NOT NULL AND created_at < $1) OR (… = $1 AND id …)` |
+| All non-final sorts set `nullable: false`, uniform dir | **Plain OR** on all engines: `created_at < $1 OR (created_at = $1 AND id < $2)`   |
+| Same + dialect supports row compare (Postgres, SQLite) | **Row compare**: `(created_at, id) < ($1, $2)` — Index Cond seek on Postgres      |
+| Same on MSSQL (`nullable: false`)                      | **Plain OR** (no portable tuple compare)                                          |
+| Same on MySQL (`nullable: false`)                      | Stays **null-safe OR** (benches: plain OR / row compare regress at depth)         |
+| Mixed sort directions                                  | Plain OR only where allowed; never row compare                                    |
 
 **Defaults stay null-safe.** Mark non-null feed columns with `nullable: false` when you want the seek-friendly path. That flag is a **runtime assertion** (not inferred from TypeScript types); if the column can actually contain NULLs, pages can be wrong.
 

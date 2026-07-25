@@ -9,6 +9,12 @@ export type DialectMeta = {
   defaultNullsSortAsc: NullsDirection
   /** SQL row-value comparison: (a, b) < ($1, $2) */
   supportsRowValueCompare: boolean
+  /**
+   * When false, `simple_non_null` sorts stay on the null-safe OR tree instead of
+   * classic plain OR. MySQL's optimizer seeks the null-safe form well but often
+   * walks plain OR / row compare at depth (benches). Defaults to true.
+   */
+  supportsPlainOrKeyset?: boolean
 }
 
 /**

@@ -31,6 +31,14 @@ const mssqlMeta: DialectMeta = {
   supportsNullSortDirective: false,
   defaultNullsSortAsc: 'first',
   supportsRowValueCompare: false,
+  supportsPlainOrKeyset: true,
+}
+
+const mysqlMeta: DialectMeta = {
+  supportsNullSortDirective: false,
+  defaultNullsSortAsc: 'first',
+  supportsRowValueCompare: false,
+  supportsPlainOrKeyset: false,
 }
 
 const makeEb = () => {
@@ -193,6 +201,20 @@ describe('selectKeysetStrategy', () => {
       meta: mssqlMeta,
       opt: 'seek',
       expected: 'plain_or',
+    },
+    {
+      name: 'mysql stays on null_safe_or even for simple_non_null',
+      class_: simpleDesc,
+      meta: mysqlMeta,
+      opt: 'auto',
+      expected: 'null_safe_or',
+    },
+    {
+      name: 'seek on mysql still stays null_safe_or (no row compare capability)',
+      class_: simpleDesc,
+      meta: mysqlMeta,
+      opt: 'seek',
+      expected: 'null_safe_or',
     },
   ]
 

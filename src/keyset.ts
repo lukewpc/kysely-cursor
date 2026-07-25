@@ -83,6 +83,10 @@ export const selectKeysetStrategy = (
   const allowRow = opt !== 'portable' && meta.supportsRowValueCompare && class_.uniformDir !== 'mixed'
 
   if (allowRow) return 'row_compare'
+
+  // Some engines (MySQL) seek null-safe OR better than classic plain OR at depth.
+  if (meta.supportsPlainOrKeyset === false) return 'null_safe_or'
+
   return 'plain_or'
 }
 

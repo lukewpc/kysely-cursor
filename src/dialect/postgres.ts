@@ -8,5 +8,6 @@ export class PostgresPaginationDialect extends BasePaginationDialect {
     supportsNullSortDirective: true,
     defaultNullsSortAsc: 'last' as const,
     supportsRowValueCompare: true,
+    supportsPlainOrKeyset: true,
   }
 }

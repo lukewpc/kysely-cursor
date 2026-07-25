@@ -8,5 +8,6 @@ export class SqlitePaginationDialect extends BasePaginationDialect {
     supportsNullSortDirective: true,
     defaultNullsSortAsc: 'first' as const,
     supportsRowValueCompare: true,
+    supportsPlainOrKeyset: true,
   }
 }
