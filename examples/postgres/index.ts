@@ -48,7 +48,7 @@ async function main() {
       await db.insertInto('users').values(rows).execute()
     }
 
-    const paginator = createPaginator({ dialect: PostgresPaginationDialect })
+    const paginator = createPaginator({ dialect: new PostgresPaginationDialect() })
 
     const sorts = [
       { col: 'created_at', dir: 'desc' },

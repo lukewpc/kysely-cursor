@@ -141,8 +141,13 @@ export const resolveEdges = async <O>(
 export const getSortOutput = (sort: SortItem<any, any, any, any>) =>
   'output' in sort ? sort.output : sort.col.split('.').at(-1)!
 
+/** Preimage fragment for omitted `nulls` — part of the cursor contract; do not change without bumping {@link CURSOR_VERSION}. */
+const NULLS_SIG_OMITTED = '-'
+
 export const sortSignature = (sorts: SortSet<any, any, any>) => {
-  const sig = sorts.map((s) => `${'output' in s ? s.output : s.col}:${s.dir ?? 'asc'}:${s.nulls}`).join('|')
+  const sig = sorts
+    .map((s) => `${'output' in s ? s.output : s.col}:${s.dir ?? 'asc'}:${s.nulls ?? NULLS_SIG_OMITTED}`)
+    .join('|')
   return createHash('sha256').update(sig).digest('hex').slice(0, 8)
 }
 
