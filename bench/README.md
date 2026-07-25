@@ -222,6 +222,11 @@ A **regression** is any matched cell whose **cursor mean** is ≥ `threshold`× 
 baseline (default **1.5**). The primary signal is library keyset latency, not
 offset (engine behavior we do not control).
 
+**CI gating** (`--fail-on-regression`) only fails the job for library scenarios at
+**depth ≥ 100** or sequential **walk** cells. Shallow depths and `ideal-baseline`
+(raw SQL ceiling) still appear in the report as informational — runner noise often
+dominates sub-ms cells.
+
 | Flag                   | Meaning                                                          |
 | ---------------------- | ---------------------------------------------------------------- |
 | `--compare`            | Diff current run (or `--current` / `--merge`) against baseline   |
@@ -229,7 +234,7 @@ offset (engine behavior we do not control).
 | `--merge <path[,…]>`   | Merge partial baseline JSON files or dirs (CI matrix); skips run |
 | `--baseline <path>`    | Baseline JSON (default `bench/baseline/results.json`)            |
 | `--threshold <n>`      | Cursor-mean ratio that counts as a regression                    |
-| `--fail-on-regression` | Exit 1 when any cell is a regression                             |
+| `--fail-on-regression` | Exit 1 on CI-gating regressions (see above)                      |
 | `--comment-out <path>` | Write the compare markdown (for PR comments)                     |
 | `--update-baseline`    | Write `bench/baseline/{results.json,summary.md}`                 |
 | `--git-sha <sha>`      | Embed SHA in the JSON (CI sets this from `GITHUB_SHA`)           |
@@ -246,8 +251,9 @@ Benchmarks run as a **dialect matrix** in `.github/workflows/ci.yml`
 1. Each **Bench (dialect)** job builds the library, runs that dialect only
    (same seed/page/depth config as the committed baseline), and diffs its cells
    against `bench/baseline/results.json` (compare scopes to dialects present in
-   the current run). The job fails on cursor-mean regressions ≥ 1.5× when the
-   baseline was produced on CI (`gitSha` set).
+   the current run). The job fails on **CI-gating** cursor-mean regressions ≥ 1.5×
+   (library path, depth ≥ 100 or walks) when the baseline was produced on CI
+   (`gitSha` set).
 2. **Bench report** downloads all dialect artifacts, merges them with
    `--merge bench/artifacts`, and:
    - On **pull_request**: posts a sticky PR comment with the combined compare report.

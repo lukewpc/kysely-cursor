@@ -10,8 +10,9 @@ on:
 permissions:
   contents: read
 
+# One active CI run per PR / branch; new pushes cancel the previous run instead of queuing.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
