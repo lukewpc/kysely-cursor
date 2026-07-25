@@ -36,9 +36,7 @@ export function createAppPaginator(options?: {
    */
   keysetStrategy?: 'auto' | 'portable'
 }): Paginator {
-  const cursorCodec = options?.secret
-    ? createEncryptedCursorCodec(options.secret)
-    : defaultCursorCodec
+  const cursorCodec = options?.secret ? createEncryptedCursorCodec(options.secret) : defaultCursorCodec
 
   return createPaginator({
     dialect: new PostgresPaginationDialect(),

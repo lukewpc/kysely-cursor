@@ -2,19 +2,8 @@
 import { access, readdir, stat } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 
-import {
-  DEFAULT_BASELINE_DIR,
-  DEFAULT_BASELINE_JSON,
-  loadBaseline,
-  mergeBaselines,
-  writeBaseline,
-} from './baseline.js'
-import {
-  compareBaselines,
-  DEFAULT_REGRESSION_THRESHOLD,
-  hasRegressions,
-  renderCompareMarkdown,
-} from './compare.js'
+import { DEFAULT_BASELINE_DIR, DEFAULT_BASELINE_JSON, loadBaseline, mergeBaselines, writeBaseline } from './baseline.js'
+import { compareBaselines, DEFAULT_REGRESSION_THRESHOLD, hasRegressions, renderCompareMarkdown } from './compare.js'
 import { describeConfig, parseArgs } from './config.js'
 import { renderBaselineMarkdown, renderConsole, writeReports } from './report.js'
 import { runBenchmarks } from './runner.js'
@@ -122,10 +111,8 @@ const main = async () => {
 
   const currentPath = getFlag(argv, '--current')
   const mergeSpec = getFlag(argv, '--merge')
-  const compareMode =
-    hasFlag(argv, '--compare') || currentPath !== undefined || mergeSpec !== undefined
-  const baselinePath =
-    getFlag(argv, '--baseline') ?? resolve(DEFAULT_BASELINE_JSON)
+  const compareMode = hasFlag(argv, '--compare') || currentPath !== undefined || mergeSpec !== undefined
+  const baselinePath = getFlag(argv, '--baseline') ?? resolve(DEFAULT_BASELINE_JSON)
   const baselineDir = getFlag(argv, '--baseline-dir') ?? DEFAULT_BASELINE_DIR
   const threshold = Number(getFlag(argv, '--threshold') ?? DEFAULT_REGRESSION_THRESHOLD)
   const failOnRegression = hasFlag(argv, '--fail-on-regression')
@@ -137,9 +124,7 @@ const main = async () => {
     if (!updateBaseline) return
     // Never promote a baseline from a run that already failed compare / set exitCode.
     if (process.exitCode) {
-      console.warn(
-        '\nSkipping --update-baseline because the run reported a regression or failure.',
-      )
+      console.warn('\nSkipping --update-baseline because the run reported a regression or failure.')
       return
     }
     const summary = renderBaselineMarkdown(baseline, full)
@@ -200,9 +185,7 @@ const main = async () => {
   // Compare against the *committed* baseline before overwriting it.
   if (compareMode) {
     if (!(await fileExists(baselinePath))) {
-      console.warn(
-        `\nNo baseline at ${baselinePath} — skip compare (commit one with --update-baseline).`,
-      )
+      console.warn(`\nNo baseline at ${baselinePath} — skip compare (commit one with --update-baseline).`)
     } else {
       await runCompare({
         current: baseline,
@@ -240,9 +223,7 @@ const runCompare = async (opts: {
 
   // Local/dev baselines have no gitSha. Absolute ms is not comparable to CI runners,
   // so only enforce --fail-on-regression when the baseline itself was CI-produced.
-  const enforce =
-    opts.failOnRegression &&
-    (Boolean(baseline.gitSha) || process.env.CI !== 'true')
+  const enforce = opts.failOnRegression && (Boolean(baseline.gitSha) || process.env.CI !== 'true')
 
   if (opts.failOnRegression && !enforce) {
     console.warn(

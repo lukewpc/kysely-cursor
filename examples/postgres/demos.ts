@@ -137,8 +137,7 @@ export async function demoForwardAndBack(db: Kysely<Database>, paginator: Pagina
   printRows(back.items)
   printPageMeta(back)
 
-  const sameIds =
-    page1.items.length === back.items.length && page1.items.every((r, i) => r.id === back.items[i]?.id)
+  const sameIds = page1.items.length === back.items.length && page1.items.every((r, i) => r.id === back.items[i]?.id)
   console.log(sameIds ? '\n✓ Backward page matches page 1 item ids.' : '\n✗ Unexpected mismatch walking back.')
 }
 
@@ -166,7 +165,7 @@ export async function demoFilteredFeed(db: Kysely<Database>, paginator: Paginato
 /** Demo 3 — nullable sort key + explicit nulls: 'last' (Postgres NULLS LAST). */
 export async function demoNullablePublishedAt(db: Kysely<Database>, paginator: Paginator) {
   heading(
-    '3. Nullable sort + nulls: \'last\'',
+    "3. Nullable sort + nulls: 'last'",
     'Drafts (published_at IS NULL) sort after published posts. Uses null-safe keyset SQL.',
   )
 
@@ -183,10 +182,7 @@ export async function demoNullablePublishedAt(db: Kysely<Database>, paginator: P
 
 /** Demo 4 — GraphQL-style edges with a per-item cursor. */
 export async function demoWithEdges(db: Kysely<Database>, paginator: Paginator) {
-  heading(
-    '4. paginateWithEdges',
-    'Same as paginate, plus edges[] of { node, cursor } for connection-style APIs.',
-  )
+  heading('4. paginateWithEdges', 'Same as paginate, plus edges[] of { node, cursor } for connection-style APIs.')
 
   const result = await paginator.paginateWithEdges({
     query: postsQuery(db),
@@ -209,10 +205,7 @@ export async function demoWithEdges(db: Kysely<Database>, paginator: Paginator) 
 
 /** Demo 5 — numeric offset when you must (legacy UI page numbers). Prefer keyset. */
 export async function demoOffsetFallback(db: Kysely<Database>, paginator: Paginator) {
-  heading(
-    '5. Offset fallback',
-    'cursor: { offset } skips N rows. Fine for small N / admin tools; avoid deep pages.',
-  )
+  heading('5. Offset fallback', 'cursor: { offset } skips N rows. Fine for small N / admin tools; avoid deep pages.')
 
   const page = await paginator.paginate({
     query: postsQuery(db),

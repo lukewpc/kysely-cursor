@@ -52,19 +52,19 @@ pnpm --filter kysely-cursor-bench bench -- --dialect postgres,sqlite --rows 5000
 
 ### CLI flags
 
-| Flag           | Default                                      | Description                                    |
-| -------------- | -------------------------------------------- | ---------------------------------------------- |
-| `--dialect`    | all                                          | Comma-separated: `postgres,mysql,mssql,sqlite` |
-| `--rows`       | `200000` (`20000` with `--quick`)            | Seed size                                      |
-| `--page-size`  | `25`                                         | Rows per page                                  |
-| `--depths`     | `0,10,50,100,500,1000,2000,4000` (quick: `0,10,50,200,400`) | Deep-page depths (0-based); clipped to dataset |
-| `--walk-pages` | `150` (`40` with `--quick`)                  | Sequential-walk length                         |
-| `--iterations` | `12` (`5` with `--quick`)                    | Timed iterations per cell                      |
-| `--warmup`     | `3` (`1` with `--quick`)                     | Untimed warmup iterations                      |
-| `--out`        | `./bench/results`                            | Ephemeral report output directory              |
-| `--quick`      | off                                          | Smaller dataset / fewer iterations             |
-| `--compare`    | off                                          | Diff vs committed baseline after the run       |
-| `--update-baseline` | off                                     | Write `bench/baseline/` (committed snapshot)   |
+| Flag                | Default                                                     | Description                                    |
+| ------------------- | ----------------------------------------------------------- | ---------------------------------------------- |
+| `--dialect`         | all                                                         | Comma-separated: `postgres,mysql,mssql,sqlite` |
+| `--rows`            | `200000` (`20000` with `--quick`)                           | Seed size                                      |
+| `--page-size`       | `25`                                                        | Rows per page                                  |
+| `--depths`          | `0,10,50,100,500,1000,2000,4000` (quick: `0,10,50,200,400`) | Deep-page depths (0-based); clipped to dataset |
+| `--walk-pages`      | `150` (`40` with `--quick`)                                 | Sequential-walk length                         |
+| `--iterations`      | `12` (`5` with `--quick`)                                   | Timed iterations per cell                      |
+| `--warmup`          | `3` (`1` with `--quick`)                                    | Untimed warmup iterations                      |
+| `--out`             | `./bench/results`                                           | Ephemeral report output directory              |
+| `--quick`           | off                                                         | Smaller dataset / fewer iterations             |
+| `--compare`         | off                                                         | Diff vs committed baseline after the run       |
+| `--update-baseline` | off                                                         | Write `bench/baseline/` (committed snapshot)   |
 
 ## Scenarios
 
@@ -82,11 +82,11 @@ pnpm --filter kysely-cursor-bench bench -- --dialect postgres,sqlite --rows 5000
 Timed scenarios set `nullable: false` on non-null sort keys. Emission still follows
 each dialect’s capability flags (same as production):
 
-| Dialect    | With `nullable: false` (feed / score sorts) | Notes |
-| ---------- | ------------------------------------------- | ----- |
-| `postgres` | **Row compare** `(created_at, id) < ($1,$2)` | Index Cond seek |
-| `sqlite`   | **Row compare**                             | Same family |
-| `mssql`    | **Plain OR** (no tuple compare)             | Cursor still wins; latency can grow with depth |
+| Dialect    | With `nullable: false` (feed / score sorts)    | Notes                                                               |
+| ---------- | ---------------------------------------------- | ------------------------------------------------------------------- |
+| `postgres` | **Row compare** `(created_at, id) < ($1,$2)`   | Index Cond seek                                                     |
+| `sqlite`   | **Row compare**                                | Same family                                                         |
+| `mssql`    | **Plain OR** (no tuple compare)                | Cursor still wins; latency can grow with depth                      |
 | `mysql`    | **Null-safe OR** (even with `nullable: false`) | Intentional: plain OR / row compare often regress at depth on MySQL |
 
 Default (unmarked) leading sorts stay **null-safe OR** on every dialect. On
@@ -108,12 +108,12 @@ WHERE (created_at, id) < ($1, $2)
 **ideal-baseline** uses raw SQL in the **same form the library uses on that dialect**,
 without the token codec or paginator wrapper:
 
-| Dialect    | Ideal keyset form                          |
-| ---------- | ------------------------------------------ |
-| `postgres` | Row compare                                |
-| `sqlite`   | Row compare                                |
-| `mysql`    | Null-safe OR (not row compare)             |
-| `mssql`    | Plain OR                                   |
+| Dialect    | Ideal keyset form              |
+| ---------- | ------------------------------ |
+| `postgres` | Row compare                    |
+| `sqlite`   | Row compare                    |
+| `mysql`    | Null-safe OR (not row compare) |
+| `mssql`    | Plain OR                       |
 
 Library deep-page should **approach** ideal on that dialect. A large inverted gap
 (lib ≫ ideal or ideal ≫ lib) usually means plan mismatch, not “magic” library
@@ -121,12 +121,12 @@ performance.
 
 Typical Postgres plans at depth ~1000+ (warm cache, ~800B rows):
 
-| Form                           | Plan shape                        | Buffers | Exec time (order of magnitude) |
-| ------------------------------ | --------------------------------- | ------- | ------------------------------ |
-| Library null-safe OR (default) | Index Scan + Filter, many removed | ~thousands | ~same as OFFSET            |
-| Library `nullable: false`      | Index Cond seek                   | ~single digits | **much faster**          |
-| Ideal row comparison (raw SQL) | Index Cond seek                   | ~same as seek  | codec ceiling            |
-| OFFSET deep skip               | Index Scan, skip N                | ~thousands | baseline                   |
+| Form                           | Plan shape                        | Buffers        | Exec time (order of magnitude) |
+| ------------------------------ | --------------------------------- | -------------- | ------------------------------ |
+| Library null-safe OR (default) | Index Scan + Filter, many removed | ~thousands     | ~same as OFFSET                |
+| Library `nullable: false`      | Index Cond seek                   | ~single digits | **much faster**                |
+| Ideal row comparison (raw SQL) | Index Cond seek                   | ~same as seek  | codec ceiling                  |
+| OFFSET deep skip               | Index Scan, skip N                | ~thousands     | baseline                       |
 
 Postgres runs attach `EXPLAIN (ANALYZE, BUFFERS)` at the deepest measured page
 (library seek form, default null-safe OR, and OFFSET).
@@ -215,17 +215,17 @@ A **regression** is any matched cell whose **cursor mean** is ≥ `threshold`× 
 baseline (default **1.5**). The primary signal is library keyset latency, not
 offset (engine behavior we do not control).
 
-| Flag | Meaning |
-| --- | --- |
-| `--compare` | Diff current run (or `--current` / `--merge`) against baseline |
-| `--current <path>` | Compare-only mode; skip running benches |
-| `--merge <path[,…]>` | Merge partial baseline JSON files or dirs (CI matrix); skips run |
-| `--baseline <path>` | Baseline JSON (default `bench/baseline/results.json`) |
-| `--threshold <n>` | Cursor-mean ratio that counts as a regression |
-| `--fail-on-regression` | Exit 1 when any cell is a regression |
-| `--comment-out <path>` | Write the compare markdown (for PR comments) |
-| `--update-baseline` | Write `bench/baseline/{results.json,summary.md}` |
-| `--git-sha <sha>` | Embed SHA in the JSON (CI sets this from `GITHUB_SHA`) |
+| Flag                   | Meaning                                                          |
+| ---------------------- | ---------------------------------------------------------------- |
+| `--compare`            | Diff current run (or `--current` / `--merge`) against baseline   |
+| `--current <path>`     | Compare-only mode; skip running benches                          |
+| `--merge <path[,…]>`   | Merge partial baseline JSON files or dirs (CI matrix); skips run |
+| `--baseline <path>`    | Baseline JSON (default `bench/baseline/results.json`)            |
+| `--threshold <n>`      | Cursor-mean ratio that counts as a regression                    |
+| `--fail-on-regression` | Exit 1 when any cell is a regression                             |
+| `--comment-out <path>` | Write the compare markdown (for PR comments)                     |
+| `--update-baseline`    | Write `bench/baseline/{results.json,summary.md}`                 |
+| `--git-sha <sha>`      | Embed SHA in the JSON (CI sets this from `GITHUB_SHA`)           |
 
 In CI, `--fail-on-regression` is **soft** until the baseline has a `gitSha`
 (i.e. was produced on GitHub Actions). Absolute ms from a laptop is not

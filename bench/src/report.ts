@@ -3,12 +3,7 @@ import { join } from 'node:path'
 
 import { toBaseline } from './baseline.js'
 import { formatMs, formatSpeedup } from './metrics.js'
-import type {
-  BaselineCell,
-  BaselineReport,
-  BenchReport,
-  ComparisonRow,
-} from './types.js'
+import type { BaselineCell, BaselineReport, BenchReport, ComparisonRow } from './types.js'
 
 const pad = (s: string, n: number) => s.padEnd(n)
 const padL = (s: string, n: number) => s.padStart(n)
@@ -126,10 +121,7 @@ export const renderMarkdown = (report: BenchReport): string => {
 }
 
 /** Render from a slim baseline; optional full report supplies titles if present. */
-export const renderBaselineMarkdown = (
-  baseline: BaselineReport,
-  full?: BenchReport,
-): string => {
+export const renderBaselineMarkdown = (baseline: BaselineReport, full?: BenchReport): string => {
   const lines: string[] = []
   const cfg = baseline.config
   const sha = baseline.gitSha ? ` · \`${baseline.gitSha.slice(0, 7)}\`` : ''
@@ -155,9 +147,7 @@ export const renderBaselineMarkdown = (
   lines.push('| Dialect | Label | Cursor | Offset | Speedup |')
   lines.push('| --- | --- | ---: | ---: | ---: |')
   for (const dialect of cfg.dialects) {
-    const deep = baseline.cells
-      .filter((c) => c.dialect === dialect && c.scenario === 'deep-page')
-      .sort(byDepthLabel)
+    const deep = baseline.cells.filter((c) => c.dialect === dialect && c.scenario === 'deep-page').sort(byDepthLabel)
     const last = deep[deep.length - 1]
     if (!last) continue
     lines.push(
@@ -177,9 +167,8 @@ export const renderBaselineMarkdown = (
     for (const scenario of scenarios) {
       const rows = cells.filter((c) => c.scenario === scenario).sort(byDepthLabel)
       const title =
-        full?.dialects
-          .find((d) => d.dialect === dialect)
-          ?.scenarios.find((s) => s.scenario === scenario)?.title ?? scenario
+        full?.dialects.find((d) => d.dialect === dialect)?.scenarios.find((s) => s.scenario === scenario)?.title ??
+        scenario
       lines.push(`### ${title}`)
       lines.push('')
       lines.push('| Label | Cursor | Offset | Speedup | Δ ms |')
@@ -197,9 +186,7 @@ export const renderBaselineMarkdown = (
   lines.push('## Deep-page growth')
   lines.push('')
   for (const dialect of cfg.dialects) {
-    const deep = baseline.cells
-      .filter((c) => c.dialect === dialect && c.scenario === 'deep-page')
-      .sort(byDepthLabel)
+    const deep = baseline.cells.filter((c) => c.dialect === dialect && c.scenario === 'deep-page').sort(byDepthLabel)
     if (deep.length < 2) continue
     const first = deep[0]!
     const last = deep[deep.length - 1]!
@@ -245,11 +232,7 @@ export const writeReports = async (
   await writeFile(markdownPath, markdown, 'utf8')
   await writeFile(jsonPath, `${JSON.stringify(baseline, null, 2)}\n`, 'utf8')
   await writeFile(join(resultsDir, 'latest-report.md'), markdown, 'utf8')
-  await writeFile(
-    join(resultsDir, 'latest-results.json'),
-    `${JSON.stringify(baseline, null, 2)}\n`,
-    'utf8',
-  )
+  await writeFile(join(resultsDir, 'latest-results.json'), `${JSON.stringify(baseline, null, 2)}\n`, 'utf8')
 
   return { markdownPath, jsonPath, baseline }
 }

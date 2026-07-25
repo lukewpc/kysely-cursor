@@ -4,25 +4,11 @@
   "config": {
     "rowCount": 200000,
     "pageSize": 25,
-    "deepPageDepths": [
-      0,
-      10,
-      50,
-      100,
-      500,
-      1000,
-      2000,
-      4000
-    ],
+    "deepPageDepths": [0, 10, 50, 100, 500, 1000, 2000, 4000],
     "walkPages": 150,
     "iterations": 12,
     "warmup": 3,
-    "dialects": [
-      "postgres",
-      "mysql",
-      "mssql",
-      "sqlite"
-    ]
+    "dialects": ["postgres", "mysql", "mssql", "sqlite"]
   },
   "cells": [
     {

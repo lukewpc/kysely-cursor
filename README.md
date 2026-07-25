@@ -94,13 +94,7 @@ yarn add kysely-cursor
 
 ```ts
 import { Kysely } from 'kysely'
-import {
-  createPaginator,
-  PostgresPaginationDialect,
-  codecPipe,
-  superJsonCodec,
-  base64UrlCodec,
-} from 'kysely-cursor'
+import { createPaginator, PostgresPaginationDialect, codecPipe, superJsonCodec, base64UrlCodec } from 'kysely-cursor'
 
 type DB = { users: { id: string; created_at: Date; email: string } }
 
@@ -190,11 +184,11 @@ Clients should treat decode failures as “start over at page 1.”
 
 ### 4. New sort / paginator options
 
-| Option | Where | Purpose |
-| ------ | ----- | ------- |
-| `nullable: false` | leading sort items | Assert no NULLs → unlock plain OR / row compare (see [Keyset predicates](#keyset-predicates)) |
-| `nulls: 'first' \| 'last'` | sort items (nullable columns) | Explicit null placement on Postgres / SQLite |
-| `keysetStrategy: 'auto' \| 'portable'` | `createPaginator` | Prefer row compare (`auto`) or never use it (`portable`) |
+| Option                                 | Where                         | Purpose                                                                                       |
+| -------------------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------- |
+| `nullable: false`                      | leading sort items            | Assert no NULLs → unlock plain OR / row compare (see [Keyset predicates](#keyset-predicates)) |
+| `nulls: 'first' \| 'last'`             | sort items (nullable columns) | Explicit null placement on Postgres / SQLite                                                  |
+| `keysetStrategy: 'auto' \| 'portable'` | `createPaginator`             | Prefer row compare (`auto`) or never use it (`portable`)                                      |
 
 ### 5. Custom dialects: extend `BasePaginationDialect`
 
@@ -311,12 +305,12 @@ See [`bench/`](./bench) for latency comparisons. CI runs the suite on every PR (
 
 Built‑ins (imported from `kysely-cursor`) — **construct with `new`**:
 
-| Class                         | Notes |
-| ----------------------------- | ----- |
-| `PostgresPaginationDialect`   | Native null defaults; supports `nulls` + row-value compare |
-| `MysqlPaginationDialect`      | No `nulls` directive; keeps null-safe OR for non-null sorts (optimizer) |
-| `MssqlPaginationDialect`      | No `nulls` directive; plain OR when `nullable: false` |
-| `SqlitePaginationDialect`     | Supports `nulls` (SQLite ≥ 3.30) + row-value compare |
+| Class                       | Notes                                                                   |
+| --------------------------- | ----------------------------------------------------------------------- |
+| `PostgresPaginationDialect` | Native null defaults; supports `nulls` + row-value compare              |
+| `MysqlPaginationDialect`    | No `nulls` directive; keeps null-safe OR for non-null sorts (optimizer) |
+| `MssqlPaginationDialect`    | No `nulls` directive; plain OR when `nullable: false`                   |
+| `SqlitePaginationDialect`   | Supports `nulls` (SQLite ≥ 3.30) + row-value compare                    |
 
 ```ts
 import {
@@ -582,12 +576,12 @@ Treat these as **400 Bad Request** unless the `code` indicates an internal failu
 
 Common cases:
 
-| Code             | Typical cause |
-| ---------------- | ------------- |
-| `INVALID_TOKEN`  | Bad / expired / version-mismatched token; sort signature mismatch; null final key |
-| `INVALID_SORT`   | Unsupported `nulls` on dialect; invalid sort configuration |
-| `INVALID_LIMIT`  | Non-positive limit |
-| `UNEXPECTED_ERROR` | Codec / internal failures |
+| Code               | Typical cause                                                                     |
+| ------------------ | --------------------------------------------------------------------------------- |
+| `INVALID_TOKEN`    | Bad / expired / version-mismatched token; sort signature mismatch; null final key |
+| `INVALID_SORT`     | Unsupported `nulls` on dialect; invalid sort configuration                        |
+| `INVALID_LIMIT`    | Non-positive limit                                                                |
+| `UNEXPECTED_ERROR` | Codec / internal failures                                                         |
 
 ---
 

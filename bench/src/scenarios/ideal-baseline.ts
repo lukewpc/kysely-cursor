@@ -54,10 +54,7 @@ const applyIdealKeyset = (
 
   if (form === 'plain_or') {
     return q.where((eb) =>
-      eb.or([
-        eb('created_at', '<', b.created_at),
-        eb.and([eb('created_at', '=', b.created_at), eb('id', '<', b.id)]),
-      ]),
+      eb.or([eb('created_at', '<', b.created_at), eb.and([eb('created_at', '=', b.created_at), eb('id', '<', b.id)])]),
     )
   }
 

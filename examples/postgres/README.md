@@ -6,10 +6,10 @@ A small, runnable tour of [kysely-cursor](../..) against Postgres. It seeds a `p
 
 This example uses **Docker Compose + pnpm scripts**, not Testcontainers.
 
-| Approach | Good for |
-| --- | --- |
+| Approach                            | Good for                                                                                          |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------- |
 | **Compose + scripts** (what we use) | Learning / iterating: DB stays up, reconnect with `psql`, re-run demos in ~1s, no extra Node deps |
-| **Testcontainers** | Automated tests in CI (this repo’s `test/dialect/*.test.ts`) — isolated, ephemeral, parallel |
+| **Testcontainers**                  | Automated tests in CI (this repo’s `test/dialect/*.test.ts`) — isolated, ephemeral, parallel      |
 
 The demo code never starts Docker itself; `package.json` owns that boundary so `index.ts` stays about the library.
 
@@ -41,10 +41,10 @@ Compose uses host port **54329** (avoids clashing with a system Postgres on 5432
 
 ### Environment
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `DATABASE_URL` | `postgres://postgres:postgres@localhost:54329/kysely_cursor_example` | Override to use your own Postgres |
-| `PAGINATION_SECRET` | _(unset)_ | When set, page tokens are encrypted (SuperJSON → AES-GCM → Base64URL) |
+| Variable            | Default                                                              | Purpose                                                               |
+| ------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `DATABASE_URL`      | `postgres://postgres:postgres@localhost:54329/kysely_cursor_example` | Override to use your own Postgres                                     |
+| `PAGINATION_SECRET` | _(unset)_                                                            | When set, page tokens are encrypted (SuperJSON → AES-GCM → Base64URL) |
 
 ```bash
 PAGINATION_SECRET='dev-only-secret' pnpm start
@@ -57,14 +57,14 @@ DATABASE_URL=postgres://user:pass@localhost:5432/mydb pnpm dev
 
 ## What it demonstrates
 
-| # | Demo | Library surface |
-| --- | --- | --- |
-| 1 | Forward / back pagination | `paginate` + `cursor: { nextPage \| prevPage }` |
-| 2 | Filtered author feed | Same sorts, different `WHERE` query |
-| 3 | Nullable column ordering | `nulls: 'last'` on Postgres |
-| 4 | Connection-style edges | `paginateWithEdges` |
-| 5 | Numeric offset | `cursor: { offset }` |
-| 6 | Full result walk | Loop on `nextPage` until exhausted |
+| #   | Demo                      | Library surface                                 |
+| --- | ------------------------- | ----------------------------------------------- |
+| 1   | Forward / back pagination | `paginate` + `cursor: { nextPage \| prevPage }` |
+| 2   | Filtered author feed      | Same sorts, different `WHERE` query             |
+| 3   | Nullable column ordering  | `nulls: 'last'` on Postgres                     |
+| 4   | Connection-style edges    | `paginateWithEdges`                             |
+| 5   | Numeric offset            | `cursor: { offset }`                            |
+| 6   | Full result walk          | Loop on `nextPage` until exhausted              |
 
 Also covered in the supporting modules:
 

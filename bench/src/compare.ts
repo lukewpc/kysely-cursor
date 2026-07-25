@@ -1,9 +1,4 @@
-import type {
-  BaselineCell,
-  BaselineReport,
-  CellDelta,
-  CompareResult,
-} from './types.js'
+import type { BaselineCell, BaselineReport, CellDelta, CompareResult } from './types.js'
 import { cellKey } from './baseline.js'
 import { formatMs, formatSpeedup } from './metrics.js'
 
@@ -16,10 +11,7 @@ const safeRatio = (current: number, baseline: number): number => {
   return current / baseline
 }
 
-const statusFor = (
-  cursorRatio: number,
-  threshold: number,
-): CellDelta['status'] => {
+const statusFor = (cursorRatio: number, threshold: number): CellDelta['status'] => {
   if (!Number.isFinite(cursorRatio)) return 'stable'
   if (cursorRatio >= threshold) return 'regression'
   if (cursorRatio <= 1 / threshold) return 'improvement'
@@ -28,10 +20,7 @@ const statusFor = (
 
 /** Shape fields that must match for ratios to be meaningful (dialect list excluded). */
 export const configShapeKey = (
-  c: Pick<
-    BaselineReport['config'],
-    'rowCount' | 'pageSize' | 'deepPageDepths' | 'walkPages' | 'iterations' | 'warmup'
-  >,
+  c: Pick<BaselineReport['config'], 'rowCount' | 'pageSize' | 'deepPageDepths' | 'walkPages' | 'iterations' | 'warmup'>,
 ): string =>
   JSON.stringify({
     rowCount: c.rowCount,
@@ -66,11 +55,7 @@ export const compareBaselines = (
     }
     const cursorRatio = safeRatio(c.cursorMean, b.cursorMean)
     const speedupRatio =
-      Number.isFinite(c.speedup) &&
-      Number.isFinite(b.speedup) &&
-      b.speedup > 0
-        ? c.speedup / b.speedup
-        : null
+      Number.isFinite(c.speedup) && Number.isFinite(b.speedup) && b.speedup > 0 ? c.speedup / b.speedup : null
     matched.push({
       key,
       dialect: c.dialect,
@@ -88,12 +73,8 @@ export const compareBaselines = (
     if (!baseMap.has(key)) newInCurrent.push(c)
   }
 
-  const regressions = matched
-    .filter((d) => d.status === 'regression')
-    .sort((a, b) => b.cursorRatio - a.cursorRatio)
-  const improvements = matched
-    .filter((d) => d.status === 'improvement')
-    .sort((a, b) => a.cursorRatio - b.cursorRatio)
+  const regressions = matched.filter((d) => d.status === 'regression').sort((a, b) => b.cursorRatio - a.cursorRatio)
+  const improvements = matched.filter((d) => d.status === 'improvement').sort((a, b) => a.cursorRatio - b.cursorRatio)
 
   return {
     baseline,
@@ -127,13 +108,11 @@ const formatConfigLine = (b: BaselineReport): string => {
 /** Concise markdown for PR comments and CI logs. */
 export const renderCompareMarkdown = (result: CompareResult): string => {
   const lines: string[] = []
-  const { baseline, current, threshold, matched, regressions, improvements } =
-    result
+  const { baseline, current, threshold, matched, regressions, improvements } = result
 
   const hasFail = regressions.length > 0
   // Dialect list may be a subset (matrix jobs); only shape fields gate ratio meaning.
-  const configMismatch =
-    configShapeKey(baseline.config) !== configShapeKey(current.config)
+  const configMismatch = configShapeKey(baseline.config) !== configShapeKey(current.config)
 
   lines.push(`# Benchmark comparison`)
   lines.push('')
@@ -144,19 +123,13 @@ export const renderCompareMarkdown = (result: CompareResult): string => {
   )
   if (configMismatch) {
     lines.push('')
-    lines.push(
-      '> ⚠️ **Config differs** from baseline — ratios may not be meaningful until configs match.',
-    )
+    lines.push('> ⚠️ **Config differs** from baseline — ratios may not be meaningful until configs match.')
   }
   lines.push('')
   lines.push(`| | Generated | Config |`)
   lines.push(`| --- | --- | --- |`)
-  lines.push(
-    `| **Baseline** | ${baseline.generatedAt} | ${formatConfigLine(baseline)} |`,
-  )
-  lines.push(
-    `| **Current** | ${current.generatedAt} | ${formatConfigLine(current)} |`,
-  )
+  lines.push(`| **Baseline** | ${baseline.generatedAt} | ${formatConfigLine(baseline)} |`)
+  lines.push(`| **Current** | ${current.generatedAt} | ${formatConfigLine(current)} |`)
   lines.push('')
   lines.push(
     'Primary signal: **cursor mean** latency (library path). Absolute ms varies by runner; ratios vs the committed baseline are what matter.',
@@ -166,9 +139,7 @@ export const renderCompareMarkdown = (result: CompareResult): string => {
   if (regressions.length) {
     lines.push('## Regressions')
     lines.push('')
-    lines.push(
-      '| Dialect | Scenario | Label | Baseline cursor | Current cursor | Δ |',
-    )
+    lines.push('| Dialect | Scenario | Label | Baseline cursor | Current cursor | Δ |')
     lines.push('| --- | --- | --- | ---: | ---: | ---: |')
     for (const d of regressions) {
       lines.push(
@@ -181,9 +152,7 @@ export const renderCompareMarkdown = (result: CompareResult): string => {
   if (improvements.length) {
     lines.push('## Improvements')
     lines.push('')
-    lines.push(
-      '| Dialect | Scenario | Label | Baseline cursor | Current cursor | Δ |',
-    )
+    lines.push('| Dialect | Scenario | Label | Baseline cursor | Current cursor | Δ |')
     lines.push('| --- | --- | --- | ---: | ---: | ---: |')
     for (const d of improvements.slice(0, 20)) {
       lines.push(
@@ -200,9 +169,7 @@ export const renderCompareMarkdown = (result: CompareResult): string => {
   // Headline: deepest deep-page per dialect
   lines.push('## Headline — deepest deep-page (cursor)')
   lines.push('')
-  lines.push(
-    '| Dialect | Label | Baseline | Current | Δ | Speedup (cur) |',
-  )
+  lines.push('| Dialect | Label | Baseline | Current | Δ | Speedup (cur) |')
   lines.push('| --- | --- | ---: | ---: | ---: | ---: |')
   const dialects = [...new Set(matched.map((m) => m.dialect))]
   for (const dialect of dialects) {
@@ -215,12 +182,7 @@ export const renderCompareMarkdown = (result: CompareResult): string => {
       })
     const last = deep[deep.length - 1]
     if (!last) continue
-    const mark =
-      last.status === 'regression'
-        ? ' ⚠️'
-        : last.status === 'improvement'
-          ? ' ✅'
-          : ''
+    const mark = last.status === 'regression' ? ' ⚠️' : last.status === 'improvement' ? ' ✅' : ''
     lines.push(
       `| ${dialect} | ${last.label} | ${formatMs(last.baseline.cursorMean)} | ${formatMs(last.current.cursorMean)} | ${formatRatio(last.cursorRatio)}${mark} | ${formatSpeedup(last.current.speedup)} |`,
     )
@@ -244,8 +206,7 @@ export const renderCompareMarkdown = (result: CompareResult): string => {
     lines.push('| Label | Baseline | Current | Δ | Offset (cur) | Speedup |')
     lines.push('| --- | ---: | ---: | ---: | ---: | ---: |')
     for (const d of deep) {
-      const mark =
-        d.status === 'regression' ? ' ⚠️' : d.status === 'improvement' ? ' ✅' : ''
+      const mark = d.status === 'regression' ? ' ⚠️' : d.status === 'improvement' ? ' ✅' : ''
       lines.push(
         `| ${d.label} | ${formatMs(d.baseline.cursorMean)} | ${formatMs(d.current.cursorMean)} | ${formatRatio(d.cursorRatio)}${mark} | ${formatMs(d.current.offsetMean)} | ${formatSpeedup(d.current.speedup)} |`,
       )
@@ -277,13 +238,10 @@ export const renderCompareMarkdown = (result: CompareResult): string => {
 
   lines.push('---')
   lines.push('')
-  lines.push(
-    `_Threshold: cursor mean ≥ ${threshold}× baseline = regression. See \`bench/README.md\`._`,
-  )
+  lines.push(`_Threshold: cursor mean ≥ ${threshold}× baseline = regression. See \`bench/README.md\`._`)
   lines.push('')
 
   return lines.join('\n')
 }
 
-export const hasRegressions = (result: CompareResult): boolean =>
-  result.regressions.length > 0
+export const hasRegressions = (result: CompareResult): boolean => result.regressions.length > 0

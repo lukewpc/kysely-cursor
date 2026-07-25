@@ -30,8 +30,7 @@ import {
 import { createAppPaginator } from './paginator.js'
 
 /** Matches docker-compose.yml (host port 54329 → container 5432). */
-export const DEFAULT_DATABASE_URL =
-  'postgres://postgres:postgres@localhost:54329/kysely_cursor_example'
+export const DEFAULT_DATABASE_URL = 'postgres://postgres:postgres@localhost:54329/kysely_cursor_example'
 
 async function main() {
   const connectionString = process.env.DATABASE_URL ?? DEFAULT_DATABASE_URL

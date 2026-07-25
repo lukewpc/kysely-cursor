@@ -1,12 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import type {
-  BaselineCell,
-  BaselineReport,
-  BenchReport,
-  ComparisonRow,
-} from './types.js'
+import type { BaselineCell, BaselineReport, BenchReport, ComparisonRow } from './types.js'
 
 export const DEFAULT_BASELINE_DIR = new URL('../baseline', import.meta.url).pathname
 export const DEFAULT_BASELINE_JSON = join(DEFAULT_BASELINE_DIR, 'results.json')
@@ -30,10 +25,7 @@ export const comparisonToCell = (c: ComparisonRow): BaselineCell => ({
 })
 
 /** Strip samples / plans into a git-friendly baseline document. */
-export const toBaseline = (
-  report: BenchReport,
-  opts?: { gitSha?: string },
-): BaselineReport => {
+export const toBaseline = (report: BenchReport, opts?: { gitSha?: string }): BaselineReport => {
   const cells: BaselineCell[] = []
   for (const d of report.dialects) {
     for (const s of d.scenarios) {
@@ -67,9 +59,7 @@ export const normalizeBaseline = (raw: unknown): BaselineReport => {
     return toBaseline(raw as BenchReport)
   }
 
-  throw new Error(
-    'Unrecognized baseline shape (expected BaselineReport v1 or full BenchReport)',
-  )
+  throw new Error('Unrecognized baseline shape (expected BaselineReport v1 or full BenchReport)')
 }
 
 export const loadBaseline = async (path: string): Promise<BaselineReport> => {
@@ -97,11 +87,7 @@ export const writeBaselineFiles = async (
   opts?: { dir?: string; gitSha?: string; summaryMarkdown?: string },
 ): Promise<{ jsonPath: string; mdPath: string; baseline: BaselineReport }> => {
   const baseline = toBaseline(report, { gitSha: opts?.gitSha })
-  const paths = await writeBaseline(
-    baseline,
-    opts?.dir ?? DEFAULT_BASELINE_DIR,
-    opts?.summaryMarkdown,
-  )
+  const paths = await writeBaseline(baseline, opts?.dir ?? DEFAULT_BASELINE_DIR, opts?.summaryMarkdown)
   return { ...paths, baseline }
 }
 
