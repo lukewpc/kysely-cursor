@@ -1,15 +1,4 @@
-/**
- * A bidirectional transformer between two value types: input `I` and output `O`.
- *
- * @template I The type accepted by `encode` and produced by `decode`.
- * @template O The type produced by `encode` and accepted by `decode`.
- *
- * @property {(value: I) => Promise<O> | O} encode
- * Transform an input value `I` into an output value `O`. May be sync or async.
- *
- * @property {(value: O) => Promise<I> | I} decode
- * Inverse transform: turn an output value `O` back into an input value `I`. May be sync or async.
- */
+/** Bidirectional transform between input `I` and output `O` (sync or async). */
 export type Codec<I = any, O = any> = {
   encode: (value: I) => Promise<O> | O
   decode: (value: O) => Promise<I> | I
@@ -36,15 +25,8 @@ type Composable<Cs extends readonly Codec[]> = Cs extends readonly []
       : false
 
 /**
- * Compose a non-empty list of codecs into a single codec.
- * Validates that the codecs are type-composable: the input of each codec must be the output of the previous.
- *
- * - `encode` runs **left → right** through the provided codecs.
- * - `decode` runs **right → left** (the inverse order).
- *
- * @template Cs A non-empty readonly tuple of codecs to compose.
- * @param {...Cs} codecs The codecs to compose, in the order their `encode` functions should run.
- * @returns Codec<InOf<First<Cs>>, OutOf<Last<Cs>>> A codec representing the composition, or `never` if the codecs are not type-composable.
+ * Compose codecs left-to-right for encode (right-to-left for decode).
+ * Type-checks that each codec’s input matches the previous codec’s output.
  */
 export const codecPipe = <Cs extends readonly [Codec, ...Codec[]]>(...codecs: Cs) =>
   ({

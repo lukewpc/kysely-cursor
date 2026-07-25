@@ -3,25 +3,16 @@ import crypto from 'crypto'
 import type { Codec } from './codec.js'
 
 /**
- * AES-256-GCM string codec using scrypt-derived keys.
+ * AES-256-GCM string codec (scrypt-derived key, random salt/IV, versioned payload).
  *
- * ## Usage
  * ```ts
- * const codec = createAesCodec(process.env.SECRET!);
- *
- * const encrypted = await codec.encode("hello");
- * const decrypted = await codec.decode(encrypted);
+ * const codec = createAesCodec(process.env.SECRET!)
+ * const encrypted = await codec.encode('hello')
+ * const decrypted = await codec.decode(encrypted)
  * ```
  *
- * ## Notes
- * - Uses `scrypt` (N=2^15, r=8, p=1) to derive a 256-bit key from `secret` + random 16-byte salt.
- * - Encrypts with random 12-byte IV and includes a 16-byte auth tag.
- * - Payload = Base64 of `[1-byte ver][salt][iv][tag][ciphertext]`.
- * - Tampering or wrong secret throws on decode.
- * - Works in Node.js with built-in `crypto`.
- *
- * @param secret - The secret key to use for the codec.
- * @returns The codec.
+ * Payload is Base64 of `[1-byte ver][salt][iv][tag][ciphertext]`.
+ * Tampering or a wrong secret throws on decode.
  */
 export const createAesCodec = (secret: string): Codec<string, string> => {
   const VERSION = Buffer.from([1])

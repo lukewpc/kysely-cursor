@@ -37,7 +37,7 @@ Run options:
   --warmup <n>               warmup iterations
   --out <dir>                ephemeral results directory        (default: ./bench/results)
   --quick                    smoke: smaller seed / fewer iters
-  --full                     poster matrix: all scenarios, dense depths
+  --full                     all scenarios, denser depths
   --update-baseline          write slim results to bench/baseline/ (skipped if compare failed)
   --baseline-dir <dir>       baseline directory                 (default: ./bench/baseline)
   --git-sha <sha>            record SHA into baseline JSON

@@ -7,23 +7,14 @@ import { measure, samplesFor, summarize } from '../metrics.js'
 import type { BenchDB, ComparisonRow, Post, Sample, ScenarioContext, ScenarioResult } from '../types.js'
 
 /**
- * Raw SQL keyset form that matches what the library emits for feed sorts with
- * `nullable: false` on each dialect (see MysqlPaginationDialect /
- * PostgresPaginationDialect meta flags). Not a generic “textbook” shape.
+ * Raw SQL keyset matching library emission for feed sorts with `nullable: false`.
  *
- * | Dialect  | Library path (`nullable: false`) | Ideal baseline SQL        |
+ * | Dialect  | Library path                     | Ideal baseline SQL        |
  * |----------|----------------------------------|---------------------------|
  * | postgres | row_compare                      | `(created_at, id) < (?,?)`|
  * | sqlite   | row_compare                      | same                      |
- * | mysql    | null_safe_or (intentional)       | IS NOT NULL guards + OR   |
+ * | mysql    | null_safe_or                     | IS NOT NULL guards + OR   |
  * | mssql    | plain_or                         | classic OR, no null guards|
- *
- * MySQL keeps null-safe OR even when callers mark keys non-null: benches show
- * plain OR / row compare often regress at depth on that engine. Ideal must
- * use the same form or “library vs ceiling” charts invert (lib faster than
- * “ideal” row compare).
- *
- * Compare with library deep-page to isolate token codec + wrapper overhead.
  */
 export type IdealKeysetForm = 'row_compare' | 'null_safe_or' | 'plain_or'
 
@@ -76,21 +67,18 @@ const describeForm = (form: IdealKeysetForm): string => {
   switch (form) {
     case 'row_compare':
       return (
-        'Dialect-matched raw keyset via row comparison `(created_at, id) < ($1, $2)` vs OFFSET — ' +
-        'same shape as library deep-page with `nullable: false` on this dialect (no token codec). ' +
-        'On Postgres this is an Index Cond seek. Compare with deep-page for codec/wrapper overhead.'
+        'Raw keyset via row comparison `(created_at, id) < ($1, $2)` vs OFFSET — ' +
+        'same shape as library deep-page with `nullable: false` (no token codec).'
       )
     case 'null_safe_or':
       return (
-        'Dialect-matched raw keyset via null-safe OR (MySQL library path even with `nullable: false`) ' +
-        'vs OFFSET — no library wrappers or token codec. Row compare / plain OR are *not* used as ' +
-        'the ceiling here; MySQL often seeks this form better at depth.'
+        'Raw keyset via null-safe OR (MySQL library path even with `nullable: false`) ' +
+        'vs OFFSET — no library wrappers or token codec.'
       )
     case 'plain_or':
       return (
-        'Dialect-matched raw keyset via classic OR (`created_at < $1 OR (created_at = $1 AND id < $2)`) ' +
-        'vs OFFSET — same shape as library deep-page on MSSQL (no row-value compare, no null-safe ' +
-        'wrappers, no token codec).'
+        'Raw keyset via classic OR (`created_at < $1 OR (created_at = $1 AND id < $2)`) ' +
+        'vs OFFSET — same shape as library deep-page on MSSQL (no token codec).'
       )
   }
 }

@@ -5,16 +5,14 @@ import type { Database, PostRow } from './db.js'
 
 const PAGE_SIZE = 5
 
-/** Chronological feed — non-null keys unlock Postgres row-compare seeks. */
+/** Chronological feed (`nullable: false` enables Postgres row-value compare). */
 export const feedSorts = [
   {
     col: 'posts.created_at' as const,
     dir: 'desc' as const,
     output: 'created_at' as const,
-    /** Assert no NULLs so the dialect may emit `(created_at, id) < ($1, $2)`. */
     nullable: false as const,
   },
-  // Final sort must be unique + non-nullable (tie-breaker). Prefer a primary key.
   { col: 'posts.id' as const, dir: 'desc' as const, output: 'id' as const },
 ] as const
 
@@ -29,10 +27,7 @@ export const scoreSorts = [
   { col: 'posts.id' as const, dir: 'desc' as const, output: 'id' as const },
 ] as const
 
-/**
- * Nullable `published_at` with explicit NULLS LAST (Postgres supports the directive).
- * Do **not** set `nullable: false` here — drafts are NULL and need the null-safe path.
- */
+/** Nullable `published_at` with `nulls: 'last'` (drafts sort after published posts). */
 export const publishedSorts = [
   {
     col: 'posts.published_at' as const,
@@ -91,10 +86,7 @@ function heading(title: string, blurb: string) {
 
 /** Demo 1 — first page, next page, then walk back with prevPage. */
 export async function demoForwardAndBack(db: Kysely<Database>, paginator: Paginator) {
-  heading(
-    '1. Forward / back keyset pagination',
-    'Tokens are opaque; sorts must stay identical between requests (signature check).',
-  )
+  heading('1. Forward / back keyset pagination', 'nextPage forward, prevPage back (same sorts each request).')
 
   const query = postsQuery(db)
 
@@ -133,7 +125,7 @@ export async function demoForwardAndBack(db: Kysely<Database>, paginator: Pagina
     cursor: { prevPage: page2.prevPage },
   })
 
-  console.log('\nBack to page 1 (via prevPage — library inverts sorts internally):')
+  console.log('\nBack to page 1 (via prevPage):')
   printRows(back.items)
   printPageMeta(back)
 
@@ -143,10 +135,7 @@ export async function demoForwardAndBack(db: Kysely<Database>, paginator: Pagina
 
 /** Demo 2 — same paginator + sorts, different filtered query (author timeline). */
 export async function demoFilteredFeed(db: Kysely<Database>, paginator: Paginator) {
-  heading(
-    '2. Filtered feed (author timeline)',
-    'Keyset works with WHERE filters — keep an index that starts with the filter columns.',
-  )
+  heading('2. Filtered feed (author timeline)', 'Same sorts, different WHERE (author = ada).')
 
   const author = 'ada'
   const query = postsQuery(db).where('author', '=', author)
@@ -164,10 +153,7 @@ export async function demoFilteredFeed(db: Kysely<Database>, paginator: Paginato
 
 /** Demo 3 — nullable sort key + explicit nulls: 'last' (Postgres NULLS LAST). */
 export async function demoNullablePublishedAt(db: Kysely<Database>, paginator: Paginator) {
-  heading(
-    "3. Nullable sort + nulls: 'last'",
-    'Drafts (published_at IS NULL) sort after published posts. Uses null-safe keyset SQL.',
-  )
+  heading("3. Nullable sort + nulls: 'last'", 'Drafts (published_at IS NULL) sort after published posts.')
 
   const page = await paginator.paginate({
     query: postsQuery(db),
@@ -203,15 +189,14 @@ export async function demoWithEdges(db: Kysely<Database>, paginator: Paginator) 
   printPageMeta(result)
 }
 
-/** Demo 5 — numeric offset when you must (legacy UI page numbers). Prefer keyset. */
+/** Demo 5 — numeric offset fallback. */
 export async function demoOffsetFallback(db: Kysely<Database>, paginator: Paginator) {
-  heading('5. Offset fallback', 'cursor: { offset } skips N rows. Fine for small N / admin tools; avoid deep pages.')
+  heading('5. Offset fallback', 'cursor: { offset } skips N rows. Prefer keyset for deep pages.')
 
   const page = await paginator.paginate({
     query: postsQuery(db),
     sorts: feedSorts,
     limit: PAGE_SIZE,
-    // Skip first page (5 rows) → roughly “page 2” of a 1-based UI.
     cursor: { offset: PAGE_SIZE },
   })
 
@@ -220,15 +205,9 @@ export async function demoOffsetFallback(db: Kysely<Database>, paginator: Pagina
   printPageMeta(page)
 }
 
-/**
- * Demo 6 — walk the whole feed with nextPage until exhausted.
- * Useful pattern for exports / background jobs.
- */
+/** Demo 6 — walk the whole feed with nextPage until exhausted. */
 export async function demoWalkAll(db: Kysely<Database>, paginator: Paginator) {
-  heading(
-    '6. Walk entire result set',
-    'Loop on nextPage until hasNextPage is false — stable under concurrent inserts at the head.',
-  )
+  heading('6. Walk entire result set', 'Loop on nextPage until hasNextPage is false.')
 
   const query = postsQuery(db)
   let cursor: { nextPage: string } | undefined
