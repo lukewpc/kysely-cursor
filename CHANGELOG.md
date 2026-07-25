@@ -1,12 +1,5 @@
 # kysely-cursor
 
-## 0.2.0
-
-### Minor Changes
-
-- ac53805: Optimize keyset WHERE emission for non-null sorts: optional `nullable: false` on sort items, dialect-aware plain OR / row-value compare, and `keysetStrategy` (`auto` | `portable`). Default (unmarked) leading sorts stay on the null-safe path.
-- 2650b51: Add dialect-aware null sorting: optional `nulls: 'first' | 'last'` on sort items, `BasePaginationDialect` with `DialectMeta`, and null-safe keyset predicates that follow each engine's default NULL placement. Dialects are now classes (`new PostgresPaginationDialect()`). Cursor payloads include a version field; PostgreSQL no longer forces NULLS FIRST/LAST on every ORDER BY when `nulls` is omitted.
-
 ## 0.1.0
 
 ### Minor Changes
