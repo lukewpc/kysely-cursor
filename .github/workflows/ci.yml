@@ -28,7 +28,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
 
       - name: Install dependencies
@@ -45,8 +45,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: [22]
-        kysely: ['0.28.8', '0.28.7', '0.28.6']
+        node: [24]
+        # peer floor → latest 0.28 → first/latest 0.29 (full list: scripts/test-kysely-versions.sh)
+        kysely:
+          - '0.28.6'
+          - '0.28.17'
+          - '0.29.0'
+          - '0.29.4'
     steps:
       - uses: actions/checkout@v4
 
@@ -60,8 +65,8 @@ jobs:
       - name: Install deps
         run: pnpm install --frozen-lockfile
 
-      - name: Bump Kysely to matrix version (devDependency only)
-        run: pnpm up kysely@${{ matrix.kysely }} -D
+      - name: Bump Kysely to matrix version
+        run: pnpm up -D -r kysely@${{ matrix.kysely }}
 
       - name: Typecheck
         run: pnpm run typecheck
@@ -70,7 +75,7 @@ jobs:
         run: pnpm test
 
       - name: Upload coverage reports to Codecov
-        if: ${{ matrix.kysely == '0.28.8' && github.ref_name == 'main' }}
+        if: ${{ matrix.kysely == '0.29.4' && github.ref_name == 'main' }}
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}

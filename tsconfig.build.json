@@ -11,9 +11,7 @@
     "types": ["node"],
     "paths": {
       "~/*": ["./src/*"]
-    },
-    // tsup's DTS rollup still injects baseUrl; silence until tsup migrates (TS 6 deprecation).
-    "ignoreDeprecations": "6.0"
+    }
   },
   "include": ["src/**/*.ts"]
 }
