@@ -9,13 +9,11 @@
  *   5. Offset fallback
  *   6. Walking an entire result set
  *
- * Database lifecycle is owned by package scripts (Docker Compose), not this file:
- *   pnpm start     # db:up + run demos (preferred)
+ * Scripts (from this directory, or `pnpm example:postgres` from repo root):
+ *   pnpm start     # start Postgres + run demos
  *   pnpm db:up     # start Postgres only
  *   pnpm db:down   # stop Postgres
  *   pnpm dev       # demos only (DB must already be up, or set DATABASE_URL)
- *
- * From repo root: pnpm example:postgres
  */
 
 import { createDb, destroy, migrate, seed } from './db.js'

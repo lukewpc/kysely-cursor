@@ -28,9 +28,8 @@ export const MIN_ABS_MS: Record<DialectName, number> = {
 }
 
 /**
- * High-SNR scenarios only. Secondary sweeps (scoreboard, filtered-feed,
- * author-timeline) stay in the report but do not fail CI — their walks/depths
- * are noisier on GHA and rarely the first signal of a real library regression.
+ * Scenarios that can fail CI. Others (scoreboard, filtered-feed, author-timeline,
+ * ideal-baseline) stay informational — noisier on GHA and secondary signals.
  */
 export const GATING_SCENARIOS = new Set(['deep-page', 'sequential-walk'])
 

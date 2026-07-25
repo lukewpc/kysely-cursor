@@ -35,21 +35,17 @@ export const classifyKeyset = (sorts: SortSet<any, any, any>, payload: CursorPay
 
     const value = payload.k[key]
 
-    // Final key must be non-null (unique tie-breaker). Fail loudly.
     if (isLast && value === null)
       throw new PaginationError({
         message: `Pagination cursor has null value for final sort "${key}"`,
         code: 'INVALID_TOKEN',
       })
 
-    // Explicit null placement always forces the null-safe path.
     if (sort.nulls === 'first' || sort.nulls === 'last') return { kind: 'null_safe' }
 
-    // Non-final keys default to nullable unless the caller opts out.
     if (!isLast) {
       if (sort.nullable !== false) return { kind: 'null_safe' }
-      // Defensive: a null in the token on a "non-null" leading key falls back
-      // to the null-safe path rather than emitting non-null SQL.
+      // Null on a "non-null" leading key → fall back to null-safe SQL.
       if (value === null) return { kind: 'null_safe' }
     }
   }
@@ -78,12 +74,11 @@ export const selectKeysetStrategy = (
 ): EmitKind => {
   if (class_.kind === 'null_safe') return 'null_safe_or'
 
-  // `portable` never uses row compare; `auto` prefers it when class + dialect allow.
   const allowRow = opt !== 'portable' && meta.supportsRowValueCompare && class_.uniformDir !== 'mixed'
 
   if (allowRow) return 'row_compare'
 
-  // Some engines (MySQL) seek null-safe OR better than classic plain OR at depth.
+  // MySQL seeks null-safe OR better than plain OR at depth.
   if (meta.supportsPlainOrKeyset === false) return 'null_safe_or'
 
   return 'plain_or'

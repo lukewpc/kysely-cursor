@@ -1,12 +1,7 @@
 import { type Generated, Kysely, PostgresDialect, sql } from 'kysely'
 import { Pool } from 'pg'
 
-/**
- * Tiny blog schema used by the demos.
- *
- * Indexes match the common keyset sort shapes so Postgres can seek instead of
- * scanning — the same composite indexes you want in production.
- */
+/** Tiny blog schema used by the demos. Indexes match the keyset sort shapes. */
 export type Post = {
   id: Generated<number>
   title: string
@@ -52,32 +47,28 @@ export async function migrate(db: Kysely<Database>): Promise<void> {
     .addColumn('created_at', 'timestamptz', (col) => col.notNull().defaultTo(sql`now()`))
     .execute()
 
-  // Feed: (created_at DESC, id DESC) — matches nullable:false seek path on Postgres.
   await sql`
     create index if not exists posts_created_at_id_desc
     on posts (created_at desc, id desc)
   `.execute(db)
 
-  // Author timeline: equality on author + same keyset tail.
   await sql`
     create index if not exists posts_author_created_at_id_desc
     on posts (author, created_at desc, id desc)
   `.execute(db)
 
-  // Scoreboard.
   await sql`
     create index if not exists posts_score_id_desc
     on posts (score desc, id desc)
   `.execute(db)
 
-  // Published feed with drafts (null published_at) ordered last.
   await sql`
     create index if not exists posts_published_at_id_desc
     on posts (published_at desc nulls last, id desc)
   `.execute(db)
 }
 
-/** Deterministic seed so re-runs are stable and demos print the same shape. */
+/** Deterministic seed so re-runs print the same shape. */
 export async function seed(db: Kysely<Database>, count = 24): Promise<void> {
   const existing = await db
     .selectFrom('posts')
@@ -96,7 +87,6 @@ export async function seed(db: Kysely<Database>, count = 24): Promise<void> {
       title: `Post ${String(n).padStart(2, '0')}`,
       author: AUTHORS[i % AUTHORS.length]!,
       score: (n * 17) % 100,
-      // Every 5th post is a draft (null published_at).
       published_at: isDraft ? null : new Date(base + i * 3_600_000),
       created_at: new Date(base + i * 3_600_000),
     }
@@ -105,7 +95,6 @@ export async function seed(db: Kysely<Database>, count = 24): Promise<void> {
   await db.insertInto('posts').values(rows).execute()
 }
 
-/** Kysely owns the pool lifecycle when the dialect was given that pool. */
 export async function destroy(db: Kysely<Database>): Promise<void> {
   await db.destroy()
 }

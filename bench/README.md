@@ -22,7 +22,7 @@ await paginator.paginate({ query, sorts, limit, cursor: { offset } })
 
 ## Prerequisites
 
-- Node 18+
+- Node 24+
 - pnpm
 - Docker (for postgres / mysql / mssql)
 
@@ -46,7 +46,7 @@ pnpm bench:quick
 pnpm bench:sqlite
 pnpm bench:postgres
 
-# full poster matrix (all scenarios, dense depths)
+# all scenarios, denser depths
 pnpm bench -- --full
 
 # even heavier local run
@@ -57,11 +57,9 @@ pnpm --filter kysely-cursor-bench bench -- \
 pnpm --filter kysely-cursor-bench bench -- --dialect postgres,sqlite --scenarios all --depths 0,10,100,500
 ```
 
-**Default profile** is what CI runs: only the high-SNR scenarios that feed the regression
-gate (`deep-page`, `sequential-walk`), depths `0,100,500`, walk 25, iters 4/1. Secondary
-scenarios (filtered-feed, author-timeline, scoreboard, ideal-baseline) stay available via
-`--full` or `--scenarios …` but are skipped on PRs to keep wall time near ~30s per dialect
-(MSSQL is often higher solely due to container startup).
+**Default profile** (what CI runs): `deep-page` + `sequential-walk`, depths `0,100,500`, walk 25,
+iters 4/1. Other scenarios are available via `--full` or `--scenarios …`. PRs skip them to keep wall
+time near ~30s per dialect (MSSQL is often higher due to container startup).
 
 ### CLI flags
 
@@ -77,20 +75,20 @@ scenarios (filtered-feed, author-timeline, scoreboard, ideal-baseline) stay avai
 | `--warmup`          | `1` (full: `2`)                                               | Untimed warmup iterations                      |
 | `--out`             | `./bench/results`                                             | Ephemeral report output directory              |
 | `--quick`           | off                                                           | Smoke: smaller seed / fewer iters              |
-| `--full`            | off                                                           | All scenarios + dense depths (poster matrix)   |
+| `--full`            | off                                                           | All scenarios + denser depths                  |
 | `--compare`         | off                                                           | Diff vs committed baseline after the run       |
 | `--update-baseline` | off                                                           | Write `bench/baseline/` (committed snapshot)   |
 
 ## Scenarios
 
-| Scenario            | CI default | What it models                                                   | Why it matters                                                     |
-| ------------------- | :--------: | ---------------------------------------------------------------- | ------------------------------------------------------------------ |
-| **deep-page**       |     ✅     | Library page at depth N (`cursor: { nextPage }` vs `{ offset }`) | Primary library comparison; tokens pre-resolved outside the timer  |
-| **sequential-walk** |     ✅     | Infinite scroll / crawl of N consecutive pages                   | End-to-end chained cost                                            |
-| **filtered-feed**   |  `--full`  | `WHERE status = 'published'` product listing                     | Selective filter + composite index                                 |
-| **author-timeline** |  `--full`  | `WHERE author_id = ?` profile feed                               | Selective secondary key + deep paging                              |
-| **scoreboard**      |  `--full`  | `ORDER BY score DESC, id DESC` ranking                           | Non-time secondary sort + `(score, id)` index                      |
-| **ideal-baseline**  |  `--full`  | Raw keyset SQL matching the dialect’s library emission           | Codec/wrapper ceiling — not a generic “textbook” shape on every DB |
+| Scenario            | CI default | What it models                                                   | Why it matters                                                    |
+| ------------------- | :--------: | ---------------------------------------------------------------- | ----------------------------------------------------------------- |
+| **deep-page**       |     ✅     | Library page at depth N (`cursor: { nextPage }` vs `{ offset }`) | Primary library comparison; tokens pre-resolved outside the timer |
+| **sequential-walk** |     ✅     | Infinite scroll / crawl of N consecutive pages                   | End-to-end chained cost                                           |
+| **filtered-feed**   |  `--full`  | `WHERE status = 'published'` product listing                     | Selective filter + composite index                                |
+| **author-timeline** |  `--full`  | `WHERE author_id = ?` profile feed                               | Selective secondary key + deep paging                             |
+| **scoreboard**      |  `--full`  | `ORDER BY score DESC, id DESC` ranking                           | Non-time secondary sort + `(score, id)` index                     |
+| **ideal-baseline**  |  `--full`  | Raw keyset SQL matching the dialect’s library emission           | Isolates codec / wrapper overhead vs raw SQL                      |
 
 ### What SQL the library emits (timed scenarios)
 
@@ -120,7 +118,7 @@ WHERE (created_at, id) < ($1, $2)
 
 ### Interpreting library vs ideal
 
-**ideal-baseline** uses raw SQL in the **same form the library uses on that dialect**,
+**ideal-baseline** runs raw SQL in the **same form the library uses on that dialect**,
 without the token codec or paginator wrapper:
 
 | Dialect    | Ideal keyset form              |
@@ -130,9 +128,8 @@ without the token codec or paginator wrapper:
 | `mysql`    | Null-safe OR (not row compare) |
 | `mssql`    | Plain OR                       |
 
-Library deep-page should **approach** ideal on that dialect. A large inverted gap
-(lib ≫ ideal or ideal ≫ lib) usually means plan mismatch, not “magic” library
-performance.
+Library deep-page should approach ideal on that dialect. A large gap usually means a
+plan mismatch between the two paths.
 
 Typical Postgres plans at depth ~1000+ (warm cache, ~800B rows):
 
@@ -140,29 +137,24 @@ Typical Postgres plans at depth ~1000+ (warm cache, ~800B rows):
 | ------------------------------ | --------------------------------- | -------------- | ------------------------------ |
 | Library null-safe OR (default) | Index Scan + Filter, many removed | ~thousands     | ~same as OFFSET                |
 | Library `nullable: false`      | Index Cond seek                   | ~single digits | **much faster**                |
-| Ideal row comparison (raw SQL) | Index Cond seek                   | ~same as seek  | codec ceiling                  |
+| Ideal row comparison (raw SQL) | Index Cond seek                   | ~same as seek  | lower bound without codec      |
 | OFFSET deep skip               | Index Scan, skip N                | ~thousands     | baseline                       |
 
 Postgres runs attach `EXPLAIN (ANALYZE, BUFFERS)` at the deepest measured page
 (library seek form, default null-safe OR, and OFFSET).
 
-### Reading MySQL (and OFFSET cliffs)
+### Reading MySQL
 
-MySQL often shows a **sharp OFFSET cliff** once skip distance and fat row payloads
-add up (this bench selects a non-indexed ~800B `body` column). Cursor stays roughly
-flat while OFFSET can jump from a few ms to hundreds of ms between mid and deep
-pages. That is **engine + workload** behavior (large `OFFSET` still walks and
-discards rows), not a library bug.
-
-**Do not** treat multi-thousand× MySQL speedups as portable marketing numbers —
-they depend on row width, indexes, and depth. Prefer quoting Postgres growth
-curves + plans, and describing MySQL as “cursor flat / OFFSET collapses under
-deep skip.”
+MySQL often shows a sharp OFFSET cliff once skip distance and fat row payloads add up
+(this bench selects a non-indexed ~800B `body` column). Cursor stays roughly flat while
+OFFSET can jump from a few ms to hundreds of ms between mid and deep pages — engine
+behavior for large `OFFSET`, not a library issue. Speedups are workload-dependent
+(row width, indexes, depth); Postgres growth curves are more portable across machines.
 
 ### Stability vs latency
 
-**Cursor pagination still wins on stability** under concurrent inserts/deletes
-(no skipped/duplicated rows). These benches measure **latency**, not correctness.
+Keyset pagination stays stable under concurrent inserts/deletes (no skipped or
+duplicated rows). These benches measure **latency**, not correctness.
 
 ### Dataset
 

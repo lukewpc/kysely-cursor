@@ -57,8 +57,6 @@ export const decodeCursor = async (cursor: CursorIncoming, keysetCodec: Codec<an
       payload: await decodeCursorPayload(cursor.prevPage, keysetCodec),
     }
   if ('offset' in cursor) {
-    // offset is user input too: a negative/fractional offset would otherwise fall
-    // through to the driver and surface as an UNEXPECTED_ERROR instead of a 400
     if (!Number.isInteger(cursor.offset) || cursor.offset < 0)
       throw new PaginationError({ message: 'Invalid pagination offset', code: 'INVALID_TOKEN' })
     return { type: 'offset', offset: cursor.offset }
@@ -77,8 +75,6 @@ const decodeCursorPayload = async (token: string, keysetCodec: Codec<any, string
 
   const parsed = CursorPayloadSchema.safeParse(decoded)
   if (!parsed.success) {
-    // a numeric but mismatched version means the token was minted by an incompatible
-    // version of this library — say so explicitly rather than reporting a generic failure
     const version = (decoded as { v?: unknown } | null)?.v
     const message =
       typeof version === 'number' && version !== CURSOR_VERSION
@@ -196,9 +192,7 @@ export const buildCursorPredicateRecursive = <DB, TB extends keyof DB, S extends
   const isLast = idx === sorts.length - 1
   const cmp = dir === 'desc' ? '<' : '>'
 
-  // The final sort is required to be non-nullable & unique, so a NULL value here
-  // means the token is malformed or tampered with. Fail loudly rather than
-  // silently rewinding to the start of the result set.
+  // Final sort is non-nullable; null here means a malformed token.
   if (isLast && value === null)
     throw new PaginationError({
       message: `Pagination cursor has null value for final sort "${key}"`,
@@ -208,46 +202,24 @@ export const buildCursorPredicateRecursive = <DB, TB extends keyof DB, S extends
   // If there are more sort keys, build the recursive predicate for ties.
   const next = !isLast ? buildCursorPredicateRecursive(eb, sorts, decoded, meta, idx + 1) : undefined
 
-  // ──────────────────────────────────────────────────────────────────────────────
-  // Cases where the cursor's current value is NULL
-  // (never the last sort key — rejected above)
-  // ──────────────────────────────────────────────────────────────────────────────
+  // NULL cursor value (never the last sort key — rejected above).
   if (value === null) {
     if (nulls === 'first') {
-      // Order: NULLs block first, then non-NULLs.
-      // After a NULL cursor:
-      //   • Remaining NULLs that come after the cursor within the NULLs block (tie goes to `next`)
-      //   • All non-NULLs (they come after the NULL block)
+      // Remaining NULLs in the leading NULL block (tie → next), then all non-NULLs.
       return eb.or([eb.and([eb(col, 'is', null), next!]), eb(col, 'is not', null)])
     }
-    // nulls === 'last'
-    // Order: non-NULLs first, then NULLs block.
-    // After a NULL cursor inside the trailing NULL block:
-    //   • Only remaining NULLs after this row (tie → `next`). There are no non-NULLs after.
+    // nulls === 'last': only remaining NULLs after this row (tie → next).
     return eb.and([eb(col, 'is', null), next!])
   }
 
-  // ──────────────────────────────────────────────────────────────────────────────
-  // Cursor value is NON-NULL
-  // ──────────────────────────────────────────────────────────────────────────────
-
-  // Base comparisons apply only to non-NULL candidates.
-  // (We add NULL candidates depending on null placement.)
+  // Non-NULL cursor value.
   const nonNullGreater = eb.and([eb(col, 'is not', null), eb(col, cmp, value)])
   const nonNullTieThenNext = !isLast ? eb.and([eb(col, 'is not', null), eb(col, '=', value), next!]) : undefined
 
   if (isLast) {
-    // Last sort key: no recursion available.
-    // After a non-NULL value:
-    //   • non-NULL rows strictly greater (per dir)
-    //   • plus NULLs if and only if NULLs are placed after non-NULLs at this position
+    // Strictly greater non-NULLs; include NULLs only when they sort after non-NULLs.
     return eb.or([nonNullGreater, ...(nulls === 'last' ? [eb(col, 'is', null)] : [])])
   }
 
-  // Not last: include the tie → next, and include NULLs when they are placed after non-NULLs.
-  return eb.or([
-    nonNullGreater, // advance on current column
-    nonNullTieThenNext!, // tie → look at the next column
-    ...(nulls === 'last' ? [eb(col, 'is', null)] : []), // when NULLs are after, they are also "after" the cursor
-  ])
+  return eb.or([nonNullGreater, nonNullTieThenNext!, ...(nulls === 'last' ? [eb(col, 'is', null)] : [])])
 }
