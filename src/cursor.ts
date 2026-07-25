@@ -56,7 +56,13 @@ export const decodeCursor = async (cursor: CursorIncoming, keysetCodec: Codec<an
       type: 'prev',
       payload: await decodeCursorPayload(cursor.prevPage, keysetCodec),
     }
-  if ('offset' in cursor) return { type: 'offset', offset: cursor.offset }
+  if ('offset' in cursor) {
+    // offset is user input too: a negative/fractional offset would otherwise fall
+    // through to the driver and surface as an UNEXPECTED_ERROR instead of a 400
+    if (!Number.isInteger(cursor.offset) || cursor.offset < 0)
+      throw new PaginationError({ message: 'Invalid pagination offset', code: 'INVALID_TOKEN' })
+    return { type: 'offset', offset: cursor.offset }
+  }
 
   throw new PaginationError({ message: 'Invalid cursor', code: 'INVALID_TOKEN' })
 }

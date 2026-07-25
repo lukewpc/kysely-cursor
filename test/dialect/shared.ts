@@ -23,26 +23,25 @@ export interface TestDB {
 
 export type TestRow = Selectable<UsersTable>
 
-export const createTestData = () => {
-  const base = new Date('2023-01-01T00:00:00.000Z')
-  const mkDate = (days: number) => new Date(base.getTime() + days * 24 * 60 * 60 * 1000)
+export const testDay = (days: number) => new Date(Date.UTC(2023, 0, 1 + days))
 
+export const createTestData = () => {
   const rows: Omit<TestRow, 'id'>[] = [
-    { name: 'Ava', created_at: mkDate(0), rating: null, active: true },
-    { name: 'Ben', created_at: mkDate(0), rating: 5, active: false },
-    { name: 'Chloé', created_at: mkDate(1), rating: 3, active: true },
-    { name: 'Drew', created_at: mkDate(2), rating: null, active: true },
-    { name: 'Eli', created_at: mkDate(2), rating: 1, active: false },
-    { name: 'Finn', created_at: mkDate(3), rating: 10, active: true },
-    { name: 'Gus', created_at: mkDate(3), rating: null, active: true },
-    { name: 'Hana', created_at: mkDate(4), rating: 4, active: false },
-    { name: 'Ivy', created_at: mkDate(4), rating: 7, active: true },
-    { name: 'Jude', created_at: mkDate(5), rating: null, active: false },
-    { name: 'Kai', created_at: mkDate(6), rating: 2, active: true },
-    { name: 'Luz', created_at: mkDate(6), rating: 8, active: true },
-    { name: 'Mia', created_at: mkDate(7), rating: null, active: true },
-    { name: 'Noah', created_at: mkDate(8), rating: 9, active: true },
-    { name: 'Oli', created_at: mkDate(9), rating: 6, active: false },
+    { name: 'Ava', created_at: testDay(0), rating: null, active: true },
+    { name: 'Ben', created_at: testDay(0), rating: 5, active: false },
+    { name: 'Chloé', created_at: testDay(1), rating: 3, active: true },
+    { name: 'Drew', created_at: testDay(2), rating: null, active: true },
+    { name: 'Eli', created_at: testDay(2), rating: 1, active: false },
+    { name: 'Finn', created_at: testDay(3), rating: 10, active: true },
+    { name: 'Gus', created_at: testDay(3), rating: null, active: true },
+    { name: 'Hana', created_at: testDay(4), rating: 4, active: false },
+    { name: 'Ivy', created_at: testDay(4), rating: 7, active: true },
+    { name: 'Jude', created_at: testDay(5), rating: null, active: false },
+    { name: 'Kai', created_at: testDay(6), rating: 2, active: true },
+    { name: 'Luz', created_at: testDay(6), rating: 8, active: true },
+    { name: 'Mia', created_at: testDay(7), rating: null, active: true },
+    { name: 'Noah', created_at: testDay(8), rating: 9, active: true },
+    { name: 'Oli', created_at: testDay(9), rating: 6, active: false },
   ]
 
   return rows
@@ -122,7 +121,18 @@ export const createTestHelpers = (db: Kysely<TestDB>, config: DatabaseConfig) =>
     })
   }
 
-  return { baseBuilder, fetchAllPlainSorted, paginator, page }
+  // mutation helpers for concurrency-stability tests. ids are always
+  // auto-generated (mssql IDENTITY forbids explicit inserts) and temp rows are
+  // addressed by their unique names, so the base fixture is never touched.
+  const insertRow = async (row: Omit<TestRow, 'id'>) => {
+    await config.insertTestData(db, [row])
+  }
+
+  const deleteRowsByName = async (names: string[]) => {
+    await db.deleteFrom('users').where('name', 'in', names).execute()
+  }
+
+  return { baseBuilder, deleteRowsByName, fetchAllPlainSorted, insertRow, paginator, page }
 }
 
 export const resolveNextPageToken = async (items: TestRow[], sorts: SortSet<TestDB, 'users', TestRow>) => {
@@ -378,7 +388,7 @@ export const runSharedTests = (
   // property: for any sort set and page size, paginating all the way forward and then
   // all the way back must replay the exact same pages in reverse order
   it('round-trips: forward then backward pagination replays identical pages', async () => {
-    const { baseBuilder, paginator } = createHelpers()
+    const { baseBuilder, fetchAllPlainSorted, paginator } = createHelpers()
 
     const sortVariants: SortSet<TestDB, 'users', TestRow>[] = [
       // non-nullable baseline
@@ -393,6 +403,19 @@ export const runSharedTests = (
       ],
       [
         { col: 'users.rating', dir: 'desc' },
+        { col: 'users.id', dir: 'asc' },
+      ],
+      // three-key sorts: the cursor predicate is recursive, and nested
+      // tie-breakers / NULL handling below the top level only get exercised
+      // from depth 2 down
+      [
+        { col: 'users.created_at', dir: 'asc' },
+        { col: 'users.rating', dir: 'desc' }, // nullable middle key
+        { col: 'users.id', dir: 'asc' },
+      ],
+      [
+        { col: 'users.rating', dir: 'asc' }, // nullable leading key with a deeper tie chain
+        { col: 'users.created_at', dir: 'desc' },
         { col: 'users.id', dir: 'asc' },
       ],
     ]
@@ -417,6 +440,7 @@ export const runSharedTests = (
     const ids = (pages: TestRow[][]) => pages.map((p) => p.map((r) => r.id))
 
     for (const sorts of sortVariants) {
+      const expected = await fetchAllPlainSorted(sorts)
       for (const limit of [1, 2, 3, 5]) {
         // walk forward through every page
         const forwardPages: TestRow[][] = []
@@ -433,6 +457,9 @@ export const runSharedTests = (
           nextToken = res.nextPage
           lastPrevToken = res.prevPage
         } while (nextToken)
+
+        // the forward walk reproduces the dialect's total order exactly
+        expect(forwardPages.flat().map((r) => r.id)).toEqual(expected.map((r) => r.id))
 
         // walk all the way back from the last page
         const backwardPages: TestRow[][] = []
@@ -451,6 +478,142 @@ export const runSharedTests = (
         // the backward walk replays every forward page except the one we started from, in reverse
         expect(ids(backwardPages)).toEqual(ids(forwardPages.slice(0, -1).reverse()))
       }
+    }
+  })
+
+  // the base fixture has no full ties on two leading keys, so a predicate that
+  // silently drops the deepest tie-breaker would still look correct there —
+  // manufacture a 3-way tie that only the final key can order
+  it('paginates 3-key sorts where the deepest tie-breaker decides order', async () => {
+    const { baseBuilder, deleteRowsByName, fetchAllPlainSorted, insertRow, paginator } = createHelpers()
+    const sorts: SortSet<TestDB, 'users', TestRow> = [
+      { col: 'users.created_at', dir: 'asc' },
+      { col: 'users.rating', dir: 'desc' }, // nullable middle key
+      { col: 'users.id', dir: 'asc' },
+    ]
+
+    // tie with the existing row id 3 (Chloé: day 1, rating 3)
+    await insertRow({ name: 'TieTestA', created_at: testDay(1), rating: 3, active: true })
+    await insertRow({ name: 'TieTestB', created_at: testDay(1), rating: 3, active: false })
+
+    try {
+      const expected = await fetchAllPlainSorted(sorts)
+
+      const tieIds = expected.filter((r) => ['Chloé', 'TieTestA', 'TieTestB'].includes(r.name)).map((r) => r.id)
+      expect(tieIds).toHaveLength(3)
+      // sanity: within the tie the oracle orders by id alone
+      expect(tieIds).toEqual([...tieIds].sort((a, b) => a - b))
+
+      // limit 2 splits the 3-row tie across two pages
+      const limit = 2
+      const forwardPages: TestRow[][] = []
+      let nextToken: string | undefined
+      let lastPrevToken: string | undefined
+      do {
+        const res = await paginator.paginate({
+          query: baseBuilder(),
+          sorts,
+          limit,
+          cursor: nextToken ? { nextPage: nextToken } : undefined,
+        })
+        forwardPages.push(res.items)
+        nextToken = res.nextPage
+        lastPrevToken = res.prevPage
+      } while (nextToken)
+
+      expect(forwardPages.flat().map((r) => r.id)).toEqual(expected.map((r) => r.id))
+
+      // and walking back from the end replays the same pages in reverse
+      const backwardPages: TestRow[][] = []
+      let prevToken = lastPrevToken
+      while (prevToken) {
+        const res = await paginator.paginate({
+          query: baseBuilder(),
+          sorts,
+          limit,
+          cursor: { prevPage: prevToken },
+        })
+        backwardPages.push(res.items)
+        prevToken = res.prevPage
+      }
+
+      const ids = (pages: TestRow[][]) => pages.map((p) => p.map((r) => r.id))
+      expect(ids(backwardPages)).toEqual(ids(forwardPages.slice(0, -1).reverse()))
+    } finally {
+      await deleteRowsByName(['TieTestA', 'TieTestB'])
+    }
+  })
+
+  // keyset's core promise vs OFFSET: a row inserted *before* the cursor position
+  // mid-walk must not shift, duplicate, or skip anything
+  it('is stable when a row is inserted before the cursor mid-walk', async () => {
+    const { deleteRowsByName, fetchAllPlainSorted, insertRow, page } = createHelpers()
+    const sorts: SortSet<TestDB, 'users', TestRow> = [
+      { col: 'users.created_at', dir: 'asc' },
+      { col: 'users.id', dir: 'asc' },
+    ]
+
+    const expected = await fetchAllPlainSorted(sorts) // 15 rows, before the insert
+    const limit = 4
+
+    const first = await page(limit, sorts)
+    expect(first.items.map((r) => r.id)).toEqual(expected.slice(0, limit).map((r) => r.id))
+    expect(first.nextPage).toBeTruthy()
+
+    // sorts before the cursor row (id 4, day 2), but only after page 1 was read
+    await insertRow({ name: 'MutationInsert', created_at: testDay(0), rating: 9, active: true })
+
+    try {
+      const walked: TestRow[] = []
+      let token = first.nextPage
+      while (token) {
+        const res = await page(limit, sorts, token)
+        walked.push(...res.items)
+        token = res.nextPage
+      }
+
+      // exactly the remaining original rows — no dupes, no skips, no sign of the insert
+      expect(walked.map((r) => r.id)).toEqual(expected.slice(limit).map((r) => r.id))
+    } finally {
+      await deleteRowsByName(['MutationInsert'])
+    }
+  })
+
+  // the row a token points at can disappear between requests (concurrent delete) —
+  // the walk must continue from the token's sort position regardless
+  it('continues cleanly when the row behind the cursor token is deleted mid-walk', async () => {
+    const { deleteRowsByName, fetchAllPlainSorted, insertRow, page } = createHelpers()
+    const sorts: SortSet<TestDB, 'users', TestRow> = [
+      { col: 'users.created_at', dir: 'asc' },
+      { col: 'users.id', dir: 'asc' },
+    ]
+
+    await insertRow({ name: 'MutationDelete', created_at: testDay(0), rating: 7, active: true })
+
+    try {
+      const expected = await fetchAllPlainSorted(sorts) // 16 rows, incl. the temp row
+      const tempId = expected.find((r) => r.name === 'MutationDelete')!.id
+      const limit = 3
+
+      // land the cursor exactly on the temp row, then delete it
+      const first = await page(limit, sorts)
+      expect(first.items.at(-1)!.id).toBe(tempId)
+      expect(first.nextPage).toBeTruthy()
+
+      await deleteRowsByName(['MutationDelete'])
+
+      const walked: TestRow[] = []
+      let token = first.nextPage
+      while (token) {
+        const res = await page(limit, sorts, token)
+        walked.push(...res.items)
+        token = res.nextPage
+      }
+
+      // the temp row sat inside page 1, so the continuation is unaffected by its absence
+      expect(walked.map((r) => r.id)).toEqual(expected.slice(limit).map((r) => r.id))
+    } finally {
+      await deleteRowsByName(['MutationDelete'])
     }
   })
 
@@ -597,11 +760,22 @@ export const runSharedTests = (
     expect(first.items.slice(firstFalseIdx).every((r) => r.active === false)).toBe(true)
   })
 
-  it('validates limit and sorts (throws on invalid limit)', async () => {
-    const { page } = createHelpers()
+  it('validates limit, offset and sorts (rejects bad input with 400-class codes)', async () => {
+    const { baseBuilder, page, paginator } = createHelpers()
     const sorts: SortSet<TestDB, 'users', TestRow> = [{ col: 'users.id', dir: 'asc' }]
-    // Invalid: limit <= 0
+
     await expect(page(0, sorts)).rejects.toThrowError(/Invalid page size limit/i)
+    for (const limit of [-1, 1.5]) {
+      await expect(paginator.paginate({ query: baseBuilder(), sorts, limit })).rejects.toMatchObject({
+        code: 'INVALID_LIMIT',
+      })
+    }
+
+    for (const offset of [-1, 2.5]) {
+      await expect(
+        paginator.paginate({ query: baseBuilder(), sorts, limit: 5, cursor: { offset } }),
+      ).rejects.toMatchObject({ code: 'INVALID_TOKEN', message: 'Invalid pagination offset' })
+    }
   })
 
   it('supports prevPage navigation (backward) and preserves item order', async () => {

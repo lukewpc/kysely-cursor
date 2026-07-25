@@ -115,6 +115,49 @@ describe('paginate (runtime)', () => {
   })
 })
 
+describe('input validation', () => {
+  it('rejects non-integer and non-positive limits as INVALID_LIMIT', async () => {
+    const builder = makeBuilder<DB, 'users', UserRow>([])
+    for (const limit of [0, -1, 2.5, Number.NaN]) {
+      await expect(
+        paginate({
+          query: builder,
+          sorts: validSortsQualifiedOnly,
+          limit,
+          dialect: TestDialect,
+        }),
+      ).rejects.toMatchObject({ code: 'INVALID_LIMIT', message: 'Invalid page size limit' })
+    }
+  })
+
+  it('rejects negative and non-integer offsets as INVALID_TOKEN', async () => {
+    for (const offset of [-1, 1.5, Number.NaN]) {
+      await expect(decodeCursor({ offset }, cursorCodec)).rejects.toMatchObject({
+        code: 'INVALID_TOKEN',
+        message: 'Invalid pagination offset',
+      })
+    }
+  })
+
+  it('accepts zero and positive integer offsets', async () => {
+    await expect(decodeCursor({ offset: 0 }, cursorCodec)).resolves.toEqual({ type: 'offset', offset: 0 })
+    await expect(decodeCursor({ offset: 42 }, cursorCodec)).resolves.toEqual({ type: 'offset', offset: 42 })
+  })
+
+  it('surfaces invalid offsets from paginate as INVALID_TOKEN, not UNEXPECTED_ERROR', async () => {
+    const builder = makeBuilder<DB, 'users', UserRow>([])
+    await expect(
+      paginate({
+        query: builder,
+        sorts: validSortsQualifiedOnly,
+        limit: 5,
+        cursor: { offset: -3 },
+        dialect: TestDialect,
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_TOKEN', message: 'Invalid pagination offset' })
+  })
+})
+
 describe('paginateWithEdges (runtime)', () => {
   it('handles empty result sets (no rows)', async () => {
     const builder = makeBuilder<DB, 'users', UserRow>([]) // no rows
