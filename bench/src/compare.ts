@@ -149,9 +149,7 @@ export const renderCompareMarkdown = (result: CompareResult): string => {
 
   lines.push(`# Benchmark comparison`)
   lines.push('')
-  lines.push(
-    `${status} · ≥${threshold}× · \`${shortSha(current)}\` vs baseline \`${shortSha(baseline)}\``,
-  )
+  lines.push(`${status} · ≥${threshold}× · \`${shortSha(current)}\` vs baseline \`${shortSha(baseline)}\``)
   if (configMismatch) {
     lines.push('')
     lines.push('> ⚠️ Config differs from baseline — ratios may not be meaningful.')
@@ -215,9 +213,7 @@ export const renderCompareMarkdown = (result: CompareResult): string => {
   if (result.missingInCurrent.length || result.newInCurrent.length) {
     const miss = result.missingInCurrent.length
     const neu = result.newInCurrent.length
-    lines.push(
-      `_Coverage: ${miss ? `${miss} missing` : ''}${miss && neu ? ', ' : ''}${neu ? `${neu} new` : ''}._`,
-    )
+    lines.push(`_Coverage: ${miss ? `${miss} missing` : ''}${miss && neu ? ', ' : ''}${neu ? `${neu} new` : ''}._`)
     lines.push('')
   }
 
