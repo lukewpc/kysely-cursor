@@ -42,7 +42,7 @@ Run options:
   --merge <path[,path…]>     merge partial baseline JSON files or dirs (CI matrix); implies --compare; skips run
   --baseline <path>          baseline JSON path                 (default: bench/baseline/results.json)
   --threshold <n>            cursor-mean regression ratio       (default: 1.5)
-  --fail-on-regression       exit 1 if any cell ≥ threshold
+  --fail-on-regression       exit 1 on CI-gating regressions (ratio + abs Δ floor)
   --comment-out <path>       write compare markdown to path (for PR comments)
   --help                     show this help
 
@@ -245,7 +245,8 @@ const runCompare = async (opts: {
     const n = gatingRegressions(result).length
     console.error(
       `\nBenchmark regression: ${n} CI-gating cell(s) ≥ ${opts.threshold}× baseline cursor mean ` +
-        `(library path, depth ≥ 100 or walks; ideal-baseline / shallow depths ignored).`,
+        `and ≥ dialect abs floor (2ms remote / 0.5ms sqlite; library path, depth ≥ 100 or walks; ` +
+        `ideal-baseline / shallow / sub-floor Δ ignored).`,
     )
     process.exitCode = 1
   }

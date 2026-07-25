@@ -218,14 +218,19 @@ pnpm bench:compare
 pnpm bench -- --compare --fail-on-regression --threshold 1.5
 ```
 
-A **regression** is any matched cell whose **cursor mean** is ≥ `threshold`× the
-baseline (default **1.5**). The primary signal is library keyset latency, not
-offset (engine behavior we do not control).
+A **regression** (report row) is any matched cell whose **cursor mean** is
+≥ `threshold`× the baseline (default **1.5**). The primary signal is library
+keyset latency, not offset (engine behavior we do not control).
 
-**CI gating** (`--fail-on-regression`) only fails the job for library scenarios at
-**depth ≥ 100** or sequential **walk** cells. Shallow depths and `ideal-baseline`
-(raw SQL ceiling) still appear in the report as informational — runner noise often
-dominates sub-ms cells.
+**CI gating** (`--fail-on-regression`) fails the job only when **all** hold:
+
+1. Library scenario (not `ideal-baseline`)
+2. **depth ≥ 100** or a **walk** label (`walk=…`)
+3. Cursor-mean ratio ≥ `threshold` (default **1.5×**)
+4. Absolute slowdown ≥ dialect floor: **2ms** for postgres/mysql/mssql, **0.5ms** for sqlite
+
+Ratio spikes below the absolute floor (common on flat sub-ms cells) stay in the
+report under **Noisy / weak** and do not red the job.
 
 | Flag                   | Meaning                                                          |
 | ---------------------- | ---------------------------------------------------------------- |
@@ -234,7 +239,7 @@ dominates sub-ms cells.
 | `--merge <path[,…]>`   | Merge partial baseline JSON files or dirs (CI matrix); skips run |
 | `--baseline <path>`    | Baseline JSON (default `bench/baseline/results.json`)            |
 | `--threshold <n>`      | Cursor-mean ratio that counts as a regression                    |
-| `--fail-on-regression` | Exit 1 on CI-gating regressions (see above)                      |
+| `--fail-on-regression` | Exit 1 on CI-gating regressions (ratio **and** abs Δ floor)      |
 | `--comment-out <path>` | Write the compare markdown (for PR comments)                     |
 | `--update-baseline`    | Write `bench/baseline/{results.json,summary.md}`                 |
 | `--git-sha <sha>`      | Embed SHA in the JSON (CI sets this from `GITHUB_SHA`)           |
@@ -251,9 +256,9 @@ Benchmarks run as a **dialect matrix** in `.github/workflows/ci.yml`
 1. Each **Bench (dialect)** job builds the library, runs that dialect only
    (same seed/page/depth config as the committed baseline), and diffs its cells
    against `bench/baseline/results.json` (compare scopes to dialects present in
-   the current run). The job fails on **CI-gating** cursor-mean regressions ≥ 1.5×
-   (library path, depth ≥ 100 or walks) when the baseline was produced on CI
-   (`gitSha` set).
+   the current run). The job fails on **CI-gating** regressions (library path,
+   depth ≥ 100 or walks, ≥ 1.5× **and** ≥ abs ms floor) when the baseline was
+   produced on CI (`gitSha` set).
 2. **Bench report** downloads all dialect artifacts, merges them with
    `--merge bench/artifacts`, and:
    - On **pull_request**: posts a sticky PR comment with the combined compare report.
@@ -274,7 +279,7 @@ pnpm --filter kysely-cursor-bench bench -- \
 
 - **Speedup** = `offset.mean / cursor.mean` (higher ⇒ cursor faster).
 - **Δ ms** = `offset.mean − cursor.mean` (positive ⇒ cursor faster).
-- Absolute ms depends on machine and container RTT; **baseline ratios on CI** are the regression signal.
+- Absolute ms depends on machine and container RTT; **CI uses ratio + absolute Δ floor** against the committed baseline.
 - Page 0 is often similar for both strategies (no skip). The gap opens as depth grows.
 - Compare **within a dialect**, not absolute ms across Postgres vs SQLite (containers vs in-process).
 

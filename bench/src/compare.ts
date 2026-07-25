@@ -1,3 +1,4 @@
+import type { DialectName } from './config.js'
 import type { BaselineCell, BaselineReport, CellDelta, CompareResult } from './types.js'
 import { cellKey } from './baseline.js'
 import { formatMs, formatSpeedup } from './metrics.js'
@@ -9,6 +10,20 @@ export const DEFAULT_REGRESSION_THRESHOLD = 1.5
  * Only enforce fail-on-regression for library pages at this depth and deeper.
  */
 export const MIN_GATE_DEPTH = 100
+
+/**
+ * Minimum absolute cursor-mean slowdown (ms) required to fail CI, in addition
+ * to the ratio threshold. Ratio-only spikes on flat sub-ms cells (e.g. +0.28ms
+ * at 1.73×) are runner noise, not library regressions.
+ *
+ * Remote dialects (Docker RTT on GHA) use 2ms; in-process sqlite uses 0.5ms.
+ */
+export const MIN_ABS_MS: Record<DialectName, number> = {
+  postgres: 2,
+  mysql: 2,
+  mssql: 2,
+  sqlite: 0.5,
+}
 
 /** Raw SQL ceiling — informative, not a library regression signal. */
 const NON_GATING_SCENARIOS = new Set(['ideal-baseline'])
@@ -27,13 +42,23 @@ const statusFor = (cursorRatio: number, threshold: number): CellDelta['status'] 
   return 'stable'
 }
 
+/** Absolute cursor-mean delta in ms (current − baseline). */
+export const cursorDeltaMs = (d: CellDelta): number => d.current.cursorMean - d.baseline.cursorMean
+
 /**
  * Whether a cell regression should fail CI (`--fail-on-regression`).
  * Still listed in the report when true or false; only gating ones set exit 1.
+ *
+ * Fail only when all hold:
+ * 1. status is regression (ratio ≥ threshold)
+ * 2. library scenario (not ideal-baseline)
+ * 3. depth ≥ MIN_GATE_DEPTH or walk label
+ * 4. absolute delta ≥ MIN_ABS_MS[dialect]
  */
 export const isGatingRegression = (d: CellDelta): boolean => {
   if (d.status !== 'regression') return false
   if (NON_GATING_SCENARIOS.has(d.scenario)) return false
+  if (cursorDeltaMs(d) < MIN_ABS_MS[d.dialect]) return false
 
   const depthMatch = /^depth=(\d+)$/.exec(d.label)
   if (depthMatch) {
@@ -165,7 +190,7 @@ export const renderCompareMarkdown = (result: CompareResult): string => {
   }
 
   if (noise.length) {
-    lines.push(`### Noisy (not gated)${noise.length > 5 ? ` · ${noise.length}` : ''}`)
+    lines.push(`### Noisy / weak (not gated)${noise.length > 5 ? ` · ${noise.length}` : ''}`)
     lines.push('')
     lines.push(DELTA_HEADER)
     for (const d of noise.slice(0, 5)) lines.push(deltaRow(d))
@@ -218,7 +243,7 @@ export const renderCompareMarkdown = (result: CompareResult): string => {
   }
 
   lines.push(
-    `_Gate: library · depth ≥ ${MIN_GATE_DEPTH} or walk · cursor mean ≥ ${threshold}× · [bench/README.md](bench/README.md)_`,
+    `_Gate: library · depth ≥ ${MIN_GATE_DEPTH} or walk · ≥ ${threshold}× · Δ ≥ ${MIN_ABS_MS.postgres}ms (sqlite ${MIN_ABS_MS.sqlite}ms) · [bench/README.md](bench/README.md)_`,
   )
   lines.push('')
 

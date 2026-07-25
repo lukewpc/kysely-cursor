@@ -399,9 +399,10 @@ pnpm bench:compare        # vs committed bench/baseline/
 pnpm bench:update-baseline
 ```
 
-CI runs each dialect in parallel, posts a sticky PR comparison comment, and fails on cursor-mean regressions
-(≥ 1.5× baseline). Successful pushes to `main` refresh `bench/baseline/` only when every dialect job is green
-(`[skip ci]` bot commit). Failed / regressed main runs do not overwrite the baseline.
+CI runs each dialect in parallel, posts a sticky PR comparison comment, and fails on CI-gating
+cursor-mean regressions (≥ 1.5× **and** ≥ dialect abs ms floor on deep/walk library cells). Successful
+pushes to `main` refresh `bench/baseline/` only when every dialect job is green (`[skip ci]` bot commit).
+Failed / regressed main runs do not overwrite the baseline.
 
 ---
 
