@@ -16,9 +16,7 @@ export const mssqlFactory: DialectFactory = {
 
     try {
       process.stdout.write('  starting mssql:2022 container…\n')
-      container = await new MSSQLServerContainer('mcr.microsoft.com/mssql/server:2022-latest')
-        .acceptLicense()
-        .start()
+      container = await new MSSQLServerContainer('mcr.microsoft.com/mssql/server:2022-latest').acceptLicense().start()
 
       const dialect = new MssqlDialect({
         tarn: {

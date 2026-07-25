@@ -46,7 +46,7 @@ export const runFilteredFeed = async (ctx: ScenarioContext): Promise<ScenarioRes
     scenario: 'filtered-feed',
     title: 'Filtered feed (status = published)',
     description:
-      'WHERE status = \'published\' with the same created_at/id keyset. Models a product listing that filters a large table before paginating. Index: (status, created_at, id).',
+      "WHERE status = 'published' with the same created_at/id keyset. Models a product listing that filters a large table before paginating. Index: (status, created_at, id).",
     samples,
     comparisons: buildComparisons(handle.name, 'filtered-feed', samples, labels),
   }

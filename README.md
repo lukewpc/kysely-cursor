@@ -99,9 +99,7 @@ import { createPaginator, PostgresPaginationDialect, codecPipe, superJsonCodec, 
 
 type DB = { users: { id: string; created_at: Date; email: string } }
 
-const db = new Kysely<DB>({
-  /* ... */
-})
+const db = new Kysely<DB>({/* ... */})
 
 // Build a cursor codec: SuperJSON → Base64 URL (opaque & URL‑safe)
 const cursorCodec = codecPipe(superJsonCodec, base64UrlCodec)

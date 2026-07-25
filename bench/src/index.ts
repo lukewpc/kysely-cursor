@@ -4,7 +4,8 @@ import { renderConsole, writeReports } from './report.js'
 import { runBenchmarks } from './runner.js'
 
 const printHelp = () => {
-  console.log(`
+  console.log(
+    `
 kysely-cursor benchmarks — cursor vs offset pagination
 
 Usage:
@@ -27,7 +28,8 @@ Examples:
   pnpm bench --quick
   pnpm bench --dialect postgres,sqlite --rows 50000
   pnpm bench --dialect sqlite --depths 0,10,50,100 --iterations 20
-`.trim())
+`.trim(),
+  )
 }
 
 const main = async () => {

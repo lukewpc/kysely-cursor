@@ -27,52 +27,53 @@ type IsAny<T> = 0 extends 1 & T ? true : false
  * Omit stays allowed either way; runtime still treats omit as nullable
  * (null-safe keyset path). Emission never reads these types — only the flag.
  */
-type NullableProp<Col> = IsAny<Col> extends true
-  ? {
-      /**
-       * Whether this sort key may contain NULL values.
-       *
-       * - Default / `true`: null-safe keyset predicate path.
-       * - `false`: asserts no NULLs so the library may emit faster non-null
-       *   SQL (`plain_or` / `row_compare`) when all non-final keys opt in.
-       *
-       * Runtime only reads this flag; TypeScript does not change SQL.
-       * Against a concrete row type, `false`/`true` are rejected when they
-       * disagree with nullability of the selected field.
-       */
-      nullable?: boolean
-    }
-  : null extends Col
+type NullableProp<Col> =
+  IsAny<Col> extends true
     ? {
         /**
          * Whether this sort key may contain NULL values.
          *
-         * For columns typed as nullable in the query result, only `true` (or
-         * omit) is allowed. `false` is a compile-time error — claiming
-         * non-null would unlock faster keyset SQL that is incorrect if NULLs
-         * exist.
-         *
          * - Default / `true`: null-safe keyset predicate path.
-         * - Runtime only reads this flag; TypeScript does not change SQL.
-         */
-        nullable?: true
-      }
-    : {
-        /**
-         * Whether this sort key may contain NULL values.
-         *
-         * For columns typed as non-null in the query result, only `false` (or
-         * omit) is allowed. `true` is a compile-time error.
-         *
-         * - Default (omit): still treated as nullable at runtime (conservative
-         *   null-safe path).
          * - `false`: asserts no NULLs so the library may emit faster non-null
          *   SQL (`plain_or` / `row_compare`) when all non-final keys opt in.
          *
          * Runtime only reads this flag; TypeScript does not change SQL.
+         * Against a concrete row type, `false`/`true` are rejected when they
+         * disagree with nullability of the selected field.
          */
-        nullable?: false
+        nullable?: boolean
       }
+    : null extends Col
+      ? {
+          /**
+           * Whether this sort key may contain NULL values.
+           *
+           * For columns typed as nullable in the query result, only `true` (or
+           * omit) is allowed. `false` is a compile-time error — claiming
+           * non-null would unlock faster keyset SQL that is incorrect if NULLs
+           * exist.
+           *
+           * - Default / `true`: null-safe keyset predicate path.
+           * - Runtime only reads this flag; TypeScript does not change SQL.
+           */
+          nullable?: true
+        }
+      : {
+          /**
+           * Whether this sort key may contain NULL values.
+           *
+           * For columns typed as non-null in the query result, only `false` (or
+           * omit) is allowed. `true` is a compile-time error.
+           *
+           * - Default (omit): still treated as nullable at runtime (conservative
+           *   null-safe path).
+           * - `false`: asserts no NULLs so the library may emit faster non-null
+           *   SQL (`plain_or` / `row_compare`) when all non-final keys opt in.
+           *
+           * Runtime only reads this flag; TypeScript does not change SQL.
+           */
+          nullable?: false
+        }
 
 type SortItemCommon<Allowed> = {
   dir?: OrderByDirection
@@ -80,12 +81,24 @@ type SortItemCommon<Allowed> = {
   nulls?: null extends Allowed ? NullsDirection : undefined
 }
 
-type SortItemWithOutput<DB, TB extends keyof DB, O, Allowed, K extends MatchingKeys<O, Allowed>> = SortItemCommon<Allowed> & {
+type SortItemWithOutput<
+  DB,
+  TB extends keyof DB,
+  O,
+  Allowed,
+  K extends MatchingKeys<O, Allowed>,
+> = SortItemCommon<Allowed> & {
   col: ReferenceExpression<DB, TB>
   output: K
 } & NullableProp<O[K]>
 
-type SortItemFromCol<DB, TB extends keyof DB, O, Allowed, K extends MatchingKeys<O, Allowed>> = SortItemCommon<Allowed> & {
+type SortItemFromCol<
+  DB,
+  TB extends keyof DB,
+  O,
+  Allowed,
+  K extends MatchingKeys<O, Allowed>,
+> = SortItemCommon<Allowed> & {
   col: StringReference<DB, TB> & OptionallyQualifiedKey<TB, K>
 } & NullableProp<O[K]>
 
@@ -94,9 +107,7 @@ type SortItemFromCol<DB, TB extends keyof DB, O, Allowed, K extends MatchingKeys
  * further constrained by the selected field's type on `O`.
  */
 export type SortItem<DB, TB extends keyof DB, O, Allowed> = {
-  [K in MatchingKeys<O, Allowed>]:
-    | SortItemWithOutput<DB, TB, O, Allowed, K>
-    | SortItemFromCol<DB, TB, O, Allowed, K>
+  [K in MatchingKeys<O, Allowed>]: SortItemWithOutput<DB, TB, O, Allowed, K> | SortItemFromCol<DB, TB, O, Allowed, K>
 }[MatchingKeys<O, Allowed>]
 
 export type SortSet<DB, TB extends keyof DB, O> = readonly [
