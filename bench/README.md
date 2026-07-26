@@ -96,10 +96,10 @@ Timed scenarios set `notNull: true` on non-null sort keys. Emission still follow
 each dialect’s capability flags (same as production):
 
 | Dialect    | With `notNull: true` (feed / score sorts)    | Notes                                                               |
-| ---------- | ---------------------------------------------- | ------------------------------------------------------------------- |
-| `postgres` | **Row compare** `(created_at, id) < ($1,$2)`   | Index Cond seek                                                     |
-| `sqlite`   | **Row compare**                                | Same family                                                         |
-| `mssql`    | **Plain OR** (no tuple compare)                | Cursor still wins; latency can grow with depth                      |
+| ---------- | -------------------------------------------- | ------------------------------------------------------------------- |
+| `postgres` | **Row compare** `(created_at, id) < ($1,$2)` | Index Cond seek                                                     |
+| `sqlite`   | **Row compare**                              | Same family                                                         |
+| `mssql`    | **Plain OR** (no tuple compare)              | Cursor still wins; latency can grow with depth                      |
 | `mysql`    | **Null-safe OR** (even with `notNull: true`) | Intentional: plain OR / row compare often regress at depth on MySQL |
 
 Default (unmarked) leading sorts stay **null-safe OR** on every dialect. On
@@ -136,7 +136,7 @@ Typical Postgres plans at depth ~1000+ (warm cache, ~800B rows):
 | Form                           | Plan shape                        | Buffers        | Exec time (order of magnitude) |
 | ------------------------------ | --------------------------------- | -------------- | ------------------------------ |
 | Library null-safe OR (default) | Index Scan + Filter, many removed | ~thousands     | ~same as OFFSET                |
-| Library `notNull: true`      | Index Cond seek                   | ~single digits | **much faster**                |
+| Library `notNull: true`        | Index Cond seek                   | ~single digits | **much faster**                |
 | Ideal row comparison (raw SQL) | Index Cond seek                   | ~same as seek  | lower bound without codec      |
 | OFFSET deep skip               | Index Scan, skip N                | ~thousands     | baseline                       |
 
