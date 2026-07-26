@@ -7,19 +7,39 @@
 
 Cursor-based (keyset) pagination for [Kysely](https://github.com/kysely-org/kysely).
 
-- Fast, stable next/prev via keyset predicates
-- Dialects: PostgreSQL, MySQL, MSSQL, SQLite
-- Explicit null ordering (`nulls: 'first' | 'last'`) where the engine supports it
-- Pluggable codecs (opaque, encryptable, or stashed tokens)
-- Connection-style edges via `paginateWithEdges`
+- Stable next/previous pages using keyset seeks
+- PostgreSQL, MySQL, SQL Server, and SQLite
+- Explicit null ordering where the database supports it
+- Pluggable page tokens (opaque, encrypted, or stored server-side)
+- GraphQL-style edges via `paginateWithEdges`
 
 ---
 
 ## Why keyset?
 
-`OFFSET … LIMIT` is simple but deep pages get slower and concurrent writes can skip/duplicate rows. **Keyset pagination** seeks from the boundary row’s sort keys (e.g. `(created_at, id)`) so the engine can use an index range instead of skipping rows.
+Classic `OFFSET … LIMIT` is easy to write, but two problems show up at scale:
 
-Offset is still available as `cursor: { offset }` for legacy numeric pages. That path is a hybrid: mid-window results can mint keyset tokens, but empty offset-past-end pages set `hasPrevPage` without a `prevPage` token (see [API](#api)).
+1. **Deep pages get slow** — the database still walks over every skipped row.
+2. **Concurrent writes** — inserts and deletes while someone pages can skip or duplicate rows.
+
+**Keyset pagination** avoids both. Each page token remembers the sort values of the last row you saw (for example `created_at` + `id`). The next query is “give me rows _after_ this point,” which can use an index range instead of skipping.
+
+### Offset still works
+
+If you already expose page numbers, you can pass an offset:
+
+```ts
+cursor: {
+  offset: 50
+}
+```
+
+That path is a **hybrid**:
+
+- When the offset lands on real rows, the response can still include keyset tokens (`nextPage` / `prevPage`) so the client can switch to keyset from there.
+- If the offset is past the end of the result set, you get an empty page. `hasPrevPage` is `true` (you are not on page 1), but there is no `prevPage` token — step back by reducing the offset. See [API](#api) and the [FAQ](#faq).
+
+Prefer keyset for new APIs. Use offset only when you must keep numeric page indexes.
 
 ---
 
@@ -29,9 +49,9 @@ Offset is still available as `cursor: { offset }` for legacy numeric pages. That
 pnpm add kysely-cursor   # or: npm i / yarn add
 ```
 
-Node ≥ 20 · ESM-only · Kysely ≥ 0.28.6 (peer)
+Requires **Node ≥ 20**, **ESM only**, and **Kysely ≥ 0.28.6** (peer dependency).
 
-> Page tokens are versioned but **not guaranteed stable across upgrades**.
+> Page tokens are versioned, but **not guaranteed to decode after a library upgrade**. Treat failed decodes as “start over at page 1.”
 
 ---
 
@@ -45,12 +65,12 @@ type DB = { posts: { id: number; title: string; created_at: Date } }
 
 const db = new Kysely<DB>({/* … */})
 
-// Default codec: SuperJSON → Base64 URL-safe
 const paginator = createPaginator({
   dialect: new PostgresPaginationDialect(),
 })
 
-// Final sort must be unique & non-nullable. notNull: true unlocks faster seeks.
+// Last sort column must be unique and non-null (usually the primary key).
+// notNull: true on non-null columns enables faster seek SQL — see below.
 const sorts = [
   { col: 'posts.created_at', dir: 'desc', notNull: true },
   { col: 'posts.id', dir: 'desc' },
@@ -67,10 +87,11 @@ const page2 = await paginator.paginate({
   cursor: { nextPage: page1.nextPage! },
 })
 
-// prev: cursor: { prevPage: page2.prevPage! }  // sorts inverted internally
+// Go backward:
+// cursor: { prevPage: page2.prevPage! }
 ```
 
-Same pattern with `MysqlPaginationDialect`, `MssqlPaginationDialect`, or `SqlitePaginationDialect`.
+Use the same pattern with `MysqlPaginationDialect`, `MssqlPaginationDialect`, or `SqlitePaginationDialect`.
 
 ---
 
@@ -83,99 +104,148 @@ const sorts = [
 ] as const
 ```
 
-| Field     | Notes                                                           |
-| --------- | --------------------------------------------------------------- |
-| `col`     | Column/expression; may be qualified                             |
-| `dir`     | `'asc'` (default) or `'desc'`                                   |
-| `output`  | Result field name; defaults to last segment of `col`            |
-| `notNull` | Leading keys only. Opt-in for seek-friendly SQL (see below)     |
-| `nulls`   | `'first'` \| `'last'` on Postgres/SQLite; throws on MySQL/MSSQL |
+| Field     | Meaning                                                                                               |
+| --------- | ----------------------------------------------------------------------------------------------------- |
+| `col`     | Column or expression to sort by (may be table-qualified)                                              |
+| `dir`     | `'asc'` (default) or `'desc'`                                                                         |
+| `output`  | Field name on each result row. Defaults to the last segment of `col` (so `posts.id` → `id`)           |
+| `notNull` | Promise that this column has no NULLs. Opt-in; unlocks faster SQL (see [Faster seeks](#faster-seeks)) |
+| `nulls`   | Put NULLs `'first'` or `'last'`. Postgres and SQLite only; MySQL/MSSQL throw if set                   |
 
-- **`notNull`:** omit (default) stays null-safe even if TS says non-null. Set `notNull: true` to unlock plain OR / row compare. `notNull: false` only allowed on nullable columns. The column must actually be non-null at runtime.
-- Leading sorts may be nullable; the **final** sort must be non-null and unique.
-- Prefer a composite index matching the sort, e.g. `(created_at DESC, id DESC)`.
-- Use the **same** `sorts` on every request for a screen (including `col` qualification / `output`); tokens include a sort signature.
+**Rules of thumb:**
 
----
+- Leading sort columns may be nullable. The **last** sort column must be non-null and unique (almost always the primary key).
+- Always pass the **same** `sorts` for a given screen — including `col` spelling and `output`. Tokens embed a sort signature and reject mismatches.
+- Add a composite index that matches the sort, e.g. `(created_at DESC, id DESC)`.
 
-## Keyset SQL
+### `notNull`
 
-One semantic model; emission varies by sort flags and dialect:
+By default the library generates **null-safe** keyset SQL, even if TypeScript thinks a column is non-null. That is the safe choice when you are unsure.
 
-| Situation                                       | Shape (DESC)                                     |
-| ----------------------------------------------- | ------------------------------------------------ |
-| Default / explicit `nulls`                      | Null-safe OR                                     |
-| All non-final keys `notNull: true`, uniform dir | Plain OR — or **row compare** on Postgres/SQLite |
-| Same on MSSQL                                   | Plain OR                                         |
-| Same on MySQL                                   | Stays null-safe OR (optimizer-friendly)          |
+Set `notNull: true` only when you know the column never contains NULL (and the database agrees). That allows simpler, faster seek predicates.
 
-`keysetStrategy`: `'auto'` (default — prefer row compare when allowed) or `'portable'` (never row compare).
-
-**Deep-page checklist:** matching composite index · `notNull: true` on every non-null leading key · uniform directions · leave `keysetStrategy` at `auto`.
+- `notNull: true` — only on columns that are actually non-null at runtime
+- `notNull: false` — only allowed on nullable columns
+- omit — null-safe path (default)
 
 ---
 
-## Dialects & nulls
+## Faster seeks
 
-| Dialect    | Class                       | Row compare | `nulls`    | Default NULLs (ASC) |
-| ---------- | --------------------------- | ----------- | ---------- | ------------------- |
-| PostgreSQL | `PostgresPaginationDialect` | ✅          | ✅         | last                |
-| MySQL      | `MysqlPaginationDialect`    | —           | ❌         | first               |
-| SQL Server | `MssqlPaginationDialect`    | —           | ❌         | first               |
-| SQLite     | `SqlitePaginationDialect`   | ✅          | ✅ (3.30+) | first               |
+For deep pages you want the database to use an index range. Three things make that reliable:
 
-Construct with `new`. Custom engines: extend `BasePaginationDialect` and set `meta`.
+1. A **composite index** matching your sort order
+2. **`notNull: true`** on every non-null leading sort column
+3. **Uniform directions** (all `asc` or all `desc`)
 
-Omit `nulls` → dialect-native defaults. `prev` inverts direction and explicit `nulls` so the total order stays consistent.
+When those hold, the library can emit simpler SQL. On Postgres and SQLite it may use a **row comparison** such as `(created_at, id) < ($1, $2)`. Elsewhere it uses a plain multi-column `OR` chain.
 
----
+| Situation                                                           | SQL style                                               |
+| ------------------------------------------------------------------- | ------------------------------------------------------- |
+| Default, or any sort uses explicit `nulls`                          | Null-safe `OR` (always correct, a bit heavier)          |
+| All non-final keys `notNull: true`, same direction, Postgres/SQLite | Plain `OR`, or **row compare** when allowed             |
+| Same, SQL Server                                                    | Plain `OR`                                              |
+| Same, MySQL                                                         | Stays on null-safe `OR` (tends to plan better on MySQL) |
 
-## Codecs
+Control this with `keysetStrategy` on the paginator:
 
-Default: `codecPipe(superJsonCodec, base64UrlCodec)`.
-
-| Export                   | Role                            |
-| ------------------------ | ------------------------------- |
-| `superJsonCodec`         | Dates, BigInts, …               |
-| `base64UrlCodec`         | URL-safe string                 |
-| `createAesCodec(secret)` | AES-256-GCM                     |
-| `stashCodec(stash)`      | External store → UUID token     |
-| `codecPipe(…)`           | Compose left-to-right on encode |
+- `'auto'` (default) — use row compare when the dialect and sorts allow it
+- `'portable'` — never use row compare (plain / null-safe `OR` only)
 
 ```ts
-// Encrypt tokens
-cursorCodec: codecPipe(superJsonCodec, createAesCodec(process.env.PAGINATION_SECRET!), base64UrlCodec)
-
-// Or stash server-side (e.g. Redis TTL) so tokens are short UUIDs.
-cursorCodec: stashCodec({ get: (k) => redis.get(k), set: (k, v) => redis.set(k, v) })
+const paginator = createPaginator({
+  dialect: new PostgresPaginationDialect(),
+  keysetStrategy: 'auto', // default
+})
 ```
 
-Tokens still carry sort-key **values**. Encrypt/stash if that data is sensitive; tokens are page handles, not auth.
+If a deep page is still slow on Postgres, you are probably still on the null-safe path — check the list above, or run `pnpm bench:postgres`.
+
+---
+
+## Dialects and nulls
+
+Pick a dialect class and pass an instance to `createPaginator`:
+
+| Dialect    | Class                       | Row compare | `nulls` option     | Default NULL placement (ASC) |
+| ---------- | --------------------------- | ----------- | ------------------ | ---------------------------- |
+| PostgreSQL | `PostgresPaginationDialect` | yes         | yes                | last                         |
+| MySQL      | `MysqlPaginationDialect`    | no          | no (throws if set) | first                        |
+| SQL Server | `MssqlPaginationDialect`    | no          | no (throws if set) | first                        |
+| SQLite     | `SqlitePaginationDialect`   | yes         | yes (SQLite 3.30+) | first                        |
+
+If you omit `nulls` on a sort, each dialect uses its native default (table above).
+
+Going to the **previous** page inverts sort direction and any explicit `nulls` values so the total order stays the same as when you walked forward.
+
+For an unsupported engine, extend `BasePaginationDialect` and set `meta` to describe what the database can do.
+
+---
+
+## Codecs (page tokens)
+
+A page token is an opaque string your client sends back on the next request. By default tokens are:
+
+1. Serialized with **SuperJSON** (Dates, BigInts, etc.)
+2. Encoded as **URL-safe Base64**
+
+```ts
+// default is equivalent to:
+cursorCodec: codecPipe(superJsonCodec, base64UrlCodec)
+```
+
+| Export                   | Purpose                                                    |
+| ------------------------ | ---------------------------------------------------------- |
+| `superJsonCodec`         | Serialize rich JS values                                   |
+| `base64UrlCodec`         | Turn bytes/strings into a URL-safe token                   |
+| `createAesCodec(secret)` | Encrypt with AES-256-GCM                                   |
+| `stashCodec(stash)`      | Store payload server-side; token is a short id (e.g. UUID) |
+| `codecPipe(…)`           | Compose codecs (encode left → right)                       |
+
+```ts
+// Encrypt tokens so sort values are not readable client-side
+cursorCodec: codecPipe(superJsonCodec, createAesCodec(process.env.PAGINATION_SECRET!), base64UrlCodec)
+
+// Or keep tokens short: store the payload in Redis (or similar) under a UUID
+cursorCodec: stashCodec({
+  get: (k) => redis.get(k),
+  set: (k, v) => redis.set(k, v),
+})
+```
+
+Tokens encode the **sort key values** of boundary rows. They are page handles, not auth. Encrypt or stash them if those values are sensitive.
 
 ---
 
 ## API
 
+### `createPaginator`
+
 ```ts
 createPaginator({
   dialect,                              // e.g. new PostgresPaginationDialect()
-  cursorCodec?,                         // default SuperJSON → Base64URL
-  keysetStrategy?: 'auto' | 'portable', // default 'auto'
-  maxLimit?,                            // optional; limit > maxLimit → INVALID_LIMIT
+  cursorCodec?,                         // default: SuperJSON → Base64URL
+  keysetStrategy?: 'auto' | 'portable', // default: 'auto'
+  maxLimit?,                            // optional cap; larger limit → INVALID_LIMIT
 }): Paginator  // { paginate, paginateWithEdges }
 ```
 
+You can also call standalone `paginate` / `paginateWithEdges` with the same options fields inlined.
+
+### `paginate`
+
 ```ts
-// also: paginate / paginateWithEdges with the same fields inline
 await paginator.paginate({
-  query,   // SelectQueryBuilder
+  query,   // Kysely SelectQueryBuilder (filters stay on the query)
   sorts,
   limit,   // positive integer
   cursor?, // { nextPage } | { prevPage } | { offset }
 })
 ```
 
-**`paginate` result**
+The paginator only adds **order**, **limit**, and the **keyset/offset seek**. Put filters on `query` yourself.
+
+**Result shape:**
 
 ```ts
 {
@@ -189,62 +259,68 @@ await paginator.paginate({
 }
 ```
 
-`hasNextPage` / `hasPrevPage` are independent of whether `nextPage` / `prevPage` are set.
-With pure offset, an empty page at `offset > 0` sets `hasPrevPage: true` without a `prevPage` token —
-step back via offset, not a keyset cursor. Mid-window offset pages may still mint keyset tokens for hybrid continue.
+`hasNextPage` / `hasPrevPage` tell you whether another page exists. `nextPage` / `prevPage` are the tokens to fetch it — and they are **not always set** even when the flags are true (notably with pure offset past the end of the set). See the [FAQ](#faq).
 
-`paginateWithEdges` swaps `items` for `edges: { node: T; cursor: string }[]`.
+### `paginateWithEdges`
 
-**Filters** stay on the Kysely query; the paginator only applies order, limit, and the keyset predicate.
+Same as `paginate`, but returns Relay-style edges instead of a flat `items` array:
+
+```ts
+edges: {
+  node: T
+  cursor: string
+}
+;[]
+```
 
 ### Errors
 
-`PaginationError` with `code`:
+Failures throw `PaginationError` with a `code`:
 
-| Code               | Typical cause                                          |
-| ------------------ | ------------------------------------------------------ |
-| `INVALID_TOKEN`    | Bad/old token, sort signature mismatch, invalid offset |
-| `INVALID_SORT`     | Empty sorts, unsupported `nulls`                       |
-| `INVALID_LIMIT`    | Non-positive limit, or limit above `maxLimit`          |
-| `UNEXPECTED_ERROR` | Internal / codec failure (`cause`)                     |
+| Code               | Typical cause                                                 |
+| ------------------ | ------------------------------------------------------------- |
+| `INVALID_TOKEN`    | Corrupt/expired token, sort signature mismatch, bad offset    |
+| `INVALID_SORT`     | Empty sorts, or `nulls` on a dialect that does not support it |
+| `INVALID_LIMIT`    | Non-positive limit, or above `maxLimit`                       |
+| `UNEXPECTED_ERROR` | Internal or codec failure (see `cause`)                       |
 
-Map client mistakes to **400**; `UNEXPECTED_ERROR` to **500**.
+Map client mistakes to **HTTP 400** and `UNEXPECTED_ERROR` to **500**.
 
 ---
 
-## Examples & benchmarks
+## Examples and benchmarks
 
 ```bash
-pnpm example:postgres   # Compose + demos: next/prev, filters, nulls, edges, offset, full walk
-pnpm bench:quick        # smoke
-pnpm bench              # CI profile (all dialects)
-pnpm bench:compare      # vs bench/baseline/
+pnpm example:postgres   # Docker Compose demos: next/prev, filters, nulls, edges, offset
+pnpm bench:quick        # smoke benchmark
+pnpm bench              # full CI profile (all dialects)
+pnpm bench:compare      # compare against bench/baseline/
 ```
 
-Details: [`examples/postgres`](./examples/postgres) · [`bench/README.md`](./bench/README.md).
+More detail: [`examples/postgres`](./examples/postgres) · [`bench/README.md`](./bench/README.md).
 
-CI runs lint, a Kysely version matrix, and per-dialect benches with regression checks vs `bench/baseline/`.
+CI runs lint, a Kysely version matrix, and per-dialect benches with regression checks against `bench/baseline/`.
 
 ---
 
 ## FAQ
 
 **Why do tokens break when I change sorts?**  
-Tokens hash the sort spec (columns, directions, null placement). A mismatch throws so screens cannot share tokens. Treat decode failures as “start over at page 1.”
+Each token includes a hash of the sort spec (columns, directions, null placement). If the next request uses different sorts, decode fails on purpose so two screens cannot accidentally share tokens. Start over at page 1.
 
 **Why is `hasPrevPage` true but `prevPage` missing?**  
-Usually an **offset** request past the end of the result set: no rows, so the library does not invent a keyset prev token, but `offset > 0` means you are not on the first page. Keep the client’s offset and step back (`offset - limit`, clamped to 0), or drop offset and restart with keyset tokens. Do not wire “Back” solely to `prevPage` if you still accept `cursor: { offset }`.
+Usually an **offset** request past the end of the data: there are no rows to build a keyset token from, but `offset > 0` means you are not on the first page. Step back with a smaller offset (`offset - limit`, floored at 0), or drop offset and use keyset tokens after the first successful page. If you still accept `cursor: { offset }`, do not wire “Back” only to `prevPage`.
 
 **Deep page still slow on Postgres?**  
-You’re likely still on the null-safe path. Set `notNull: true` on non-null leading keys, match a composite index, keep `keysetStrategy: 'auto'`. See the checklist above and `pnpm bench:postgres`.
+You are likely still on null-safe SQL. Set `notNull: true` on non-null leading keys, match a composite index, leave `keysetStrategy: 'auto'`. See [Faster seeks](#faster-seeks) and `pnpm bench:postgres`.
 
-**Do I need `output`?**  
-Only when the select alias differs from the last segment of `col`.
+**When do I need `output`?**  
+Only when the name of the field on the result row differs from the last segment of `col` (for example `col: 'posts.created_at'` selected as `createdAt`).
 
-**First page `prevPage`?**  
-Usually no. The library over-fetches `limit + 1` for `hasNextPage`. `prevPage` appears after you move forward.
+**Does the first page have `prevPage`?**  
+Usually no. The library fetches `limit + 1` rows to set `hasNextPage`. `prevPage` shows up after you have moved forward.
 
-**Force SQL without row-value compare?**  
+**How do I force SQL without row-value compare?**  
 `keysetStrategy: 'portable'`.
 
 ---
