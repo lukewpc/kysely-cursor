@@ -4,11 +4,7 @@ describe('stashCodec', () => {
   it('stores value and returns a uuid key, then retrieves by key', async () => {
     const storage = new Map<string, string>()
     const stash: Stash = {
-      get: async (key) => {
-        const v = storage.get(key)
-        if (v === undefined) throw new Error('not found')
-        return v
-      },
+      get: async (key) => storage.get(key) ?? null,
       set: async (key, value) => {
         storage.set(key, value)
       },
@@ -24,19 +20,24 @@ describe('stashCodec', () => {
     expect(value).toBe('very-secret')
   })
 
-  it('rejects when decoding an unknown key', async () => {
+  it('rejects when decoding an unknown key (null from get)', async () => {
     const storage = new Map<string, string>()
     const stash: Stash = {
-      get: async (key) => {
-        const v = storage.get(key)
-        if (v === undefined) throw new Error('not found')
-        return v
-      },
+      get: async (key) => storage.get(key) ?? null,
       set: async (key, value) => {
         storage.set(key, value)
       },
     }
     const codec = stashCodec(stash)
     await expect(codec.decode('00000000-0000-4000-8000-000000000000')).rejects.toThrow(/not found/i)
+  })
+
+  it('rejects when get returns undefined', async () => {
+    const stash: Stash = {
+      get: async () => undefined,
+      set: async () => {},
+    }
+    const codec = stashCodec(stash)
+    await expect(codec.decode('any-key')).rejects.toThrow(/not found/i)
   })
 })

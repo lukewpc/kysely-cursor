@@ -10,9 +10,9 @@ describe('codec chain', () => {
     const codec = codecPipe(
       superJsonCodec,
       base64UrlCodec,
-      createAesCodec('secret'),
+      createAesCodec('test-secret-16ch'),
       stashCodec({
-        get: async (key) => stash.get(key)!,
+        get: async (key) => stash.get(key) ?? null,
         set: async (key, value) => void stash.set(key, value),
       }),
     )

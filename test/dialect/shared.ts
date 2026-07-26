@@ -1033,7 +1033,7 @@ export const runSharedTests = (
     expect(mid.startCursor).toEqual(expectedMidStart)
     expect(mid.endCursor).toEqual(expectedMidEnd)
 
-    // Offset beyond dataset => empty items, no cursors
+    // Offset beyond dataset => empty items, no keyset tokens; hasPrevPage so clients can step back
     const empty = await paginator.paginate({
       query: baseBuilder(),
       sorts,
@@ -1043,6 +1043,10 @@ export const runSharedTests = (
     expect(empty.items).toHaveLength(0)
     expect(empty.startCursor).toBeUndefined()
     expect(empty.endCursor).toBeUndefined()
+    expect(empty.prevPage).toBeUndefined()
+    expect(empty.nextPage).toBeUndefined()
+    expect(empty.hasPrevPage).toBe(true)
+    expect(empty.hasNextPage).toBe(false)
   })
 
   it('starts mid-way with offset, then continues using cursor tokens', async () => {

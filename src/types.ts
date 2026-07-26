@@ -63,6 +63,11 @@ export type PaginatorOptions = {
    * See {@link KeysetStrategy}.
    */
   keysetStrategy?: KeysetStrategy
+  /**
+   * Optional upper bound on `limit`. When set, `limit > maxLimit` throws `INVALID_LIMIT`.
+   * Default: unlimited (no cap).
+   */
+  maxLimit?: number
 }
 
 export type PaginateArgs<DB, TB extends keyof DB, O, S extends SortSet<DB, TB, O>> = {

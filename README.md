@@ -19,7 +19,7 @@ Cursor-based (keyset) pagination for [Kysely](https://github.com/kysely-org/kyse
 
 `OFFSET … LIMIT` is simple but deep pages get slower and concurrent writes can skip/duplicate rows. **Keyset pagination** seeks from the boundary row’s sort keys (e.g. `(created_at, id)`) so the engine can use an index range instead of skipping rows.
 
-Offset is still available as `cursor: { offset }` for legacy numeric pages.
+Offset is still available as `cursor: { offset }` for legacy numeric pages. That path is a hybrid: mid-window results can mint keyset tokens, but empty offset-past-end pages set `hasPrevPage` without a `prevPage` token (see [API](#api)).
 
 ---
 
@@ -29,9 +29,9 @@ Offset is still available as `cursor: { offset }` for legacy numeric pages.
 pnpm add kysely-cursor   # or: npm i / yarn add
 ```
 
-Kysely ≥ 0.28.6 (peer)
+Node ≥ 20 · ESM-only · Kysely ≥ 0.28.6 (peer)
 
-> Page tokens are versioned but **not stable across library upgrades**. Discard outstanding tokens after upgrading.
+> Page tokens are versioned but **not guaranteed stable across upgrades**.
 
 ---
 
@@ -91,10 +91,10 @@ const sorts = [
 | `notNull` | Leading keys only. Opt-in for seek-friendly SQL (see below)     |
 | `nulls`   | `'first'` \| `'last'` on Postgres/SQLite; throws on MySQL/MSSQL |
 
-- **`notNull`:** omit (default) stays null-safe even if TS says non-null. Set `notNull: true` to unlock plain OR / row compare. `notNull: false` only allowed on nullable columns.
+- **`notNull`:** omit (default) stays null-safe even if TS says non-null. Set `notNull: true` to unlock plain OR / row compare. `notNull: false` only allowed on nullable columns. The column must actually be non-null at runtime.
 - Leading sorts may be nullable; the **final** sort must be non-null and unique.
 - Prefer a composite index matching the sort, e.g. `(created_at DESC, id DESC)`.
-- Use the **same** `sorts` on every request for a screen; tokens include a sort signature.
+- Use the **same** `sorts` on every request for a screen (including `col` qualification / `output`); tokens include a sort signature.
 
 ---
 
@@ -134,20 +134,20 @@ Omit `nulls` → dialect-native defaults. `prev` inverts direction and explicit 
 
 Default: `codecPipe(superJsonCodec, base64UrlCodec)`.
 
-| Export                   | Role                            |
-| ------------------------ | ------------------------------- |
-| `superJsonCodec`         | Dates, BigInts, …               |
-| `base64UrlCodec`         | URL-safe string                 |
-| `createAesCodec(secret)` | AES-256-GCM                     |
-| `stashCodec(stash)`      | External store → UUID token     |
-| `codecPipe(…)`           | Compose left-to-right on encode |
+| Export                   | Role                                              |
+| ------------------------ | ------------------------------------------------- |
+| `superJsonCodec`         | Dates, BigInts, …                                 |
+| `base64UrlCodec`         | URL-safe string                                   |
+| `createAesCodec(secret)` | AES-256-GCM                                       |
+| `stashCodec(stash)`      | External store → UUID token                       |
+| `codecPipe(…)`           | Compose left-to-right on encode                   |
 
 ```ts
 // Encrypt tokens
 cursorCodec: codecPipe(superJsonCodec, createAesCodec(process.env.PAGINATION_SECRET!), base64UrlCodec)
 
-// Or stash server-side (e.g. Redis TTL) so tokens are short UUIDs
-cursorCodec: stashCodec({ get: (k) => redis.get(k)!, set: (k, v) => redis.set(k, v) })
+// Or stash server-side (e.g. Redis TTL) so tokens are short UUIDs.
+cursorCodec: stashCodec({ get: (k) => redis.get(k), set: (k, v) => redis.set(k, v) })
 ```
 
 Tokens still carry sort-key **values**. Encrypt/stash if that data is sensitive; tokens are page handles, not auth.
@@ -161,6 +161,7 @@ createPaginator({
   dialect,                              // e.g. new PostgresPaginationDialect()
   cursorCodec?,                         // default SuperJSON → Base64URL
   keysetStrategy?: 'auto' | 'portable', // default 'auto'
+  maxLimit?,                            // optional; limit > maxLimit → INVALID_LIMIT
 }): Paginator  // { paginate, paginateWithEdges }
 ```
 
@@ -188,6 +189,10 @@ await paginator.paginate({
 }
 ```
 
+`hasNextPage` / `hasPrevPage` are independent of whether `nextPage` / `prevPage` are set.
+With pure offset, an empty page at `offset > 0` sets `hasPrevPage: true` without a `prevPage` token —
+step back via offset, not a keyset cursor. Mid-window offset pages may still mint keyset tokens for hybrid continue.
+
 `paginateWithEdges` swaps `items` for `edges: { node: T; cursor: string }[]`.
 
 **Filters** stay on the Kysely query; the paginator only applies order, limit, and the keyset predicate.
@@ -200,7 +205,7 @@ await paginator.paginate({
 | ------------------ | ------------------------------------------------------ |
 | `INVALID_TOKEN`    | Bad/old token, sort signature mismatch, invalid offset |
 | `INVALID_SORT`     | Empty sorts, unsupported `nulls`                       |
-| `INVALID_LIMIT`    | Non-positive limit                                     |
+| `INVALID_LIMIT`    | Non-positive limit, or limit above `maxLimit`          |
 | `UNEXPECTED_ERROR` | Internal / codec failure (`cause`)                     |
 
 Map client mistakes to **400**; `UNEXPECTED_ERROR` to **500**.
@@ -226,6 +231,9 @@ CI runs lint, a Kysely version matrix, and per-dialect benches with regression c
 
 **Why do tokens break when I change sorts?**  
 Tokens hash the sort spec (columns, directions, null placement). A mismatch throws so screens cannot share tokens. Treat decode failures as “start over at page 1.”
+
+**Why is `hasPrevPage` true but `prevPage` missing?**  
+Usually an **offset** request past the end of the result set: no rows, so the library does not invent a keyset prev token, but `offset > 0` means you are not on the first page. Keep the client’s offset and step back (`offset - limit`, clamped to 0), or drop offset and restart with keyset tokens. Do not wire “Back” solely to `prevPage` if you still accept `cursor: { offset }`.
 
 **Deep page still slow on Postgres?**  
 You’re likely still on the null-safe path. Set `notNull: true` on non-null leading keys, match a composite index, keep `keysetStrategy: 'auto'`. See the checklist above and `pnpm bench:postgres`.

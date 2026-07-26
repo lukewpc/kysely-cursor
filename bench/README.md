@@ -22,7 +22,7 @@ await paginator.paginate({ query, sorts, limit, cursor: { offset } })
 
 ## Prerequisites
 
-- Node 24+
+- Node 20+
 - pnpm
 - Docker (for postgres / mysql / mssql)
 

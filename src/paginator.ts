@@ -22,8 +22,9 @@ export const paginate = async <DB, TB extends keyof DB, O, S extends SortSet<DB,
   dialect,
   cursorCodec = DEFAULT_CURSOR_CODEC,
   keysetStrategy = 'auto',
+  maxLimit,
 }: PaginateArgs<DB, TB, O, S> & PaginatorOptions): Promise<PaginatedResult<O>> => {
-  assertLimitSorts(limit, sorts)
+  assertLimitSorts(limit, sorts, maxLimit)
 
   try {
     const decodedCursor = cursor ? await decodeCursor(cursor, cursorCodec) : null
@@ -56,13 +57,17 @@ export const paginate = async <DB, TB extends keyof DB, O, S extends SortSet<DB,
       rows.length > limit,
     )
 
+    // Offset past end: no rows and no keyset prev token to invent, but the client
+    // is not on the first page — surface hasPrevPage so UIs can step back via offset.
+    const emptyOffsetPastStart = items.length === 0 && decodedCursor?.type === 'offset' && decodedCursor.offset > 0
+
     return {
       items,
       prevPage,
       nextPage,
       startCursor,
       endCursor,
-      hasPrevPage: !!prevPage,
+      hasPrevPage: !!prevPage || emptyOffsetPastStart,
       hasNextPage: !!nextPage,
     }
   } catch (error) {
@@ -90,9 +95,18 @@ export const paginateWithEdges = async <DB, TB extends keyof DB, O, S extends So
   }
 }
 
-const assertLimitSorts = (limit: number, sorts: readonly unknown[]) => {
+const assertLimitSorts = (limit: number, sorts: readonly unknown[], maxLimit?: number) => {
   if (!(Number.isInteger(limit) && limit > 0))
     throw new PaginationError({ message: 'Invalid page size limit', code: 'INVALID_LIMIT' })
+  if (maxLimit !== undefined) {
+    if (!(Number.isInteger(maxLimit) && maxLimit > 0))
+      throw new PaginationError({ message: 'Invalid maxLimit', code: 'INVALID_LIMIT' })
+    if (limit > maxLimit)
+      throw new PaginationError({
+        message: `Page size limit exceeds maxLimit (${maxLimit})`,
+        code: 'INVALID_LIMIT',
+      })
+  }
   if (!Array.isArray(sorts) || sorts.length < 1)
     throw new PaginationError({ message: 'Cannot paginate without sorting', code: 'INVALID_SORT' })
 }

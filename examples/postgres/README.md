@@ -4,7 +4,7 @@ A small, runnable tour of [kysely-cursor](../..) against Postgres. It seeds a `p
 
 ## Prerequisites
 
-- Node.js 24+
+- Node.js 20+
 - Docker with Compose v2 (`docker compose`, including `up --wait`)
 - Dependencies from the monorepo root (`pnpm install`)
 

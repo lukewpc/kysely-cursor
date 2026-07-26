@@ -97,6 +97,37 @@ describe('paginate (runtime)', () => {
     })
     expect(res.items).toEqual([])
     expect(res.nextPage).toBeUndefined()
+    expect(res.hasPrevPage).toBe(false)
+    expect(res.hasNextPage).toBe(false)
+  })
+
+  it('marks hasPrevPage when offset is past the end with no rows', async () => {
+    const builder = makeBuilder<DB, 'users', UserRow>([])
+    const res = await paginate({
+      query: builder,
+      sorts: validSortsQualifiedOnly,
+      limit: 10,
+      cursor: { offset: 100 },
+      dialect: TestDialect,
+    })
+    expect(res.items).toEqual([])
+    expect(res.prevPage).toBeUndefined()
+    expect(res.nextPage).toBeUndefined()
+    expect(res.hasPrevPage).toBe(true)
+    expect(res.hasNextPage).toBe(false)
+  })
+
+  it('does not mark hasPrevPage for offset 0 empty page', async () => {
+    const builder = makeBuilder<DB, 'users', UserRow>([])
+    const res = await paginate({
+      query: builder,
+      sorts: validSortsQualifiedOnly,
+      limit: 10,
+      cursor: { offset: 0 },
+      dialect: TestDialect,
+    })
+    expect(res.items).toEqual([])
+    expect(res.hasPrevPage).toBe(false)
   })
 
   it('throws on empty sorts at runtime', async () => {
@@ -129,6 +160,32 @@ describe('input validation', () => {
         }),
       ).rejects.toMatchObject({ code: 'INVALID_LIMIT', message: 'Invalid page size limit' })
     }
+  })
+
+  it('rejects limit above maxLimit as INVALID_LIMIT', async () => {
+    const builder = makeBuilder<DB, 'users', UserRow>([])
+    await expect(
+      paginate({
+        query: builder,
+        sorts: validSortsQualifiedOnly,
+        limit: 50,
+        dialect: TestDialect,
+        maxLimit: 25,
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_LIMIT', message: /maxLimit \(25\)/ })
+  })
+
+  it('allows limit equal to maxLimit', async () => {
+    const builder = makeBuilder<DB, 'users', UserRow>([])
+    await expect(
+      paginate({
+        query: builder,
+        sorts: validSortsQualifiedOnly,
+        limit: 25,
+        dialect: TestDialect,
+        maxLimit: 25,
+      }),
+    ).resolves.toMatchObject({ items: [] })
   })
 
   it('rejects negative and non-integer offsets as INVALID_TOKEN', async () => {
