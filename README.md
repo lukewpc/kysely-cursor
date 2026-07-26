@@ -104,29 +104,52 @@ const sorts = [
 ] as const
 ```
 
-| Field     | Meaning                                                                                               |
-| --------- | ----------------------------------------------------------------------------------------------------- |
-| `col`     | Column or expression to sort by (may be table-qualified)                                              |
-| `dir`     | `'asc'` (default) or `'desc'`                                                                         |
-| `output`  | Field name on each result row. Defaults to the last segment of `col` (so `posts.id` → `id`)           |
-| `notNull` | Promise that this column has no NULLs. Opt-in; unlocks faster SQL (see [Faster seeks](#faster-seeks)) |
-| `nulls`   | Put NULLs `'first'` or `'last'`. Postgres and SQLite only; MySQL/MSSQL throw if set                   |
+| Field     | Meaning                                                                                                |
+| --------- | ------------------------------------------------------------------------------------------------------ |
+| `col`     | Column or expression to sort by (may be table-qualified)                                               |
+| `dir`     | `'asc'` (default) or `'desc'`                                                                          |
+| `output`  | Field name on each result row. Defaults to the last segment of `col` (so `posts.id` → `id`)            |
+| `notNull` | Opt-in guarantee that this column has no NULLs; unlocks faster SQL (see [Faster seeks](#faster-seeks)) |
+| `nulls`   | Put NULLs `'first'` or `'last'`. Postgres and SQLite only; MySQL and SQL Server throw if set           |
 
 **Rules of thumb:**
 
-- Leading sort columns may be nullable. The **last** sort column must be non-null and unique (almost always the primary key).
+- Leading sorts may be nullable. The **last** sort must be non-null and unique (almost always the primary key) — TypeScript requires a non-null final key.
 - Always pass the **same** `sorts` for a given screen — including `col` spelling and `output`. Tokens embed a sort signature and reject mismatches.
 - Add a composite index that matches the sort, e.g. `(created_at DESC, id DESC)`.
 
-### `notNull`
+### TypeScript checks
 
-By default the library generates **null-safe** keyset SQL, even if TypeScript thinks a column is non-null. That is the safe choice when you are unsure.
+Sort config is checked against the **columns your query returns** (the selected row type), including aliases from `output`.
 
-Set `notNull: true` only when you know the column never contains NULL (and the database agrees). That allows simpler, faster seek predicates.
+- The **last** sort must be a non-null field — ending on something like `string | null` is a type error.
+- You can only set `notNull: true` on fields typed as non-null, and `notNull: false` on fields typed as nullable. Omitting `notNull` typechecks either way.
+- You can only set `nulls` on nullable fields.
+- For SQL expressions, set `output` to the result field name so TypeScript can check that field.
 
-- `notNull: true` — only on columns that are actually non-null at runtime
-- `notNull: false` — only allowed on nullable columns
-- omit — null-safe path (default)
+Invalid combos fail at compile time, for example `notNull: true` on `name: string | null`.
+
+This only helps if your Kysely types match the database. If a column is nullable in SQL but typed as non-null, TypeScript will allow `notNull: true` and you can still get a bad plan.
+
+### `notNull` (runtime)
+
+Prefer `notNull: true` on every leading sort that is truly non-null. Omitting it still paginates safely, but keeps the heavier null-safe SQL even when the column cannot be null.
+
+With `notNull: true` (and uniform sort directions), the benefit depends on the dialect:
+
+- **Postgres / SQLite** — row compare (largest win)
+- **SQL Server** — plain multi-column `OR` (still simpler than null-safe)
+- **MySQL** — stays on null-safe `OR` on purpose (other shapes often plan worse)
+
+See [Faster seeks](#faster-seeks).
+
+| Value            | Meaning                                                        |
+| ---------------- | -------------------------------------------------------------- |
+| omit (default)   | Null-safe SQL (safe default; not the fast path)                |
+| `notNull: true`  | Assert no NULLs; **set this whenever you can** on leading keys |
+| `notNull: false` | Explicitly nullable (same SQL as omit)                         |
+
+If a page token still carries `null` for a `notNull: true` leading key, that request falls back to null-safe SQL.
 
 ---
 
@@ -140,12 +163,12 @@ For deep pages you want the database to use an index range. Three things make th
 
 When those hold, the library can emit simpler SQL. On Postgres and SQLite it may use a **row comparison** such as `(created_at, id) < ($1, $2)`. Elsewhere it uses a plain multi-column `OR` chain.
 
-| Situation                                                           | SQL style                                               |
-| ------------------------------------------------------------------- | ------------------------------------------------------- |
-| Default, or any sort uses explicit `nulls`                          | Null-safe `OR` (always correct, a bit heavier)          |
-| All non-final keys `notNull: true`, same direction, Postgres/SQLite | Plain `OR`, or **row compare** when allowed             |
-| Same, SQL Server                                                    | Plain `OR`                                              |
-| Same, MySQL                                                         | Stays on null-safe `OR` (tends to plan better on MySQL) |
+| Situation                                                                      | SQL style                                               |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------- |
+| Default, or any sort uses explicit `nulls`                                     | Null-safe `OR` (safe default, a bit heavier)            |
+| Leading columns `notNull: true`, same direction on every sort, Postgres/SQLite | Plain `OR`, or **row compare** when allowed             |
+| Same conditions on SQL Server                                                  | Plain `OR`                                              |
+| Same conditions on MySQL                                                       | Stays on null-safe `OR` (tends to plan better on MySQL) |
 
 Control this with `keysetStrategy` on the paginator:
 
@@ -159,13 +182,13 @@ const paginator = createPaginator({
 })
 ```
 
-If a deep page is still slow on Postgres, you are probably still on the null-safe path — check the list above, or run `pnpm bench:postgres`.
+If a deep page is still slow, double-check the three items above, confirm the generated SQL is the simpler form (not the null-safe `OR` chain), and inspect the query plan for an index range scan. Application slowness is almost always missing indexes or still-null-safe sorts — not something a library microbenchmark will diagnose.
 
 ---
 
 ## Dialects and nulls
 
-Pick a dialect class and pass an instance to `createPaginator`:
+Pass a dialect instance into `createPaginator`, for example `new PostgresPaginationDialect()`.
 
 | Dialect    | Class                       | Row compare | `nulls` option     | Default NULL placement (ASC) |
 | ---------- | --------------------------- | ----------- | ------------------ | ---------------------------- |
@@ -174,11 +197,11 @@ Pick a dialect class and pass an instance to `createPaginator`:
 | SQL Server | `MssqlPaginationDialect`    | no          | no (throws if set) | first                        |
 | SQLite     | `SqlitePaginationDialect`   | yes         | yes (SQLite 3.30+) | first                        |
 
-If you omit `nulls` on a sort, each dialect uses its native default (table above).
+If you omit `nulls` on a sort, the dialect’s native default from the table applies.
 
-Going to the **previous** page inverts sort direction and any explicit `nulls` values so the total order stays the same as when you walked forward.
+When you request the **previous** page, the library inverts each sort’s direction (and any explicit `nulls`) so “backward” still follows the same total order as “forward.”
 
-For an unsupported engine, extend `BasePaginationDialect` and set `meta` to describe what the database can do.
+For an unsupported engine, extend `BasePaginationDialect` and configure `meta` for that database’s capabilities.
 
 ---
 
@@ -203,17 +226,19 @@ cursorCodec: codecPipe(superJsonCodec, base64UrlCodec)
 | `codecPipe(…)`           | Compose codecs (encode left → right)                       |
 
 ```ts
-// Encrypt tokens so sort values are not readable client-side
-cursorCodec: codecPipe(superJsonCodec, createAesCodec(process.env.PAGINATION_SECRET!), base64UrlCodec)
-
-// Or keep tokens short: store the payload in Redis (or similar) under a UUID
-cursorCodec: stashCodec({
-  get: (k) => redis.get(k),
-  set: (k, v) => redis.set(k, v),
+const paginator = createPaginator({
+  dialect: new PostgresPaginationDialect(),
+  // Encrypt so sort values are not readable client-side:
+  cursorCodec: codecPipe(superJsonCodec, createAesCodec(process.env.PAGINATION_SECRET!), base64UrlCodec),
+  // Or keep tokens short by storing the payload server-side (e.g. Redis):
+  // cursorCodec: stashCodec({
+  //   get: (k) => redis.get(k),
+  //   set: (k, v) => redis.set(k, v),
+  // }),
 })
 ```
 
-Tokens encode the **sort key values** of boundary rows. They are page handles, not auth. Encrypt or stash them if those values are sensitive.
+Tokens encode the **sort key values** of boundary rows. Treat them as page handles, not as authentication. Encrypt or stash them if those values are sensitive.
 
 ---
 
@@ -230,7 +255,7 @@ createPaginator({
 }): Paginator  // { paginate, paginateWithEdges }
 ```
 
-You can also call standalone `paginate` / `paginateWithEdges` with the same options fields inlined.
+Standalone `paginate` / `paginateWithEdges` accept the same fields as options on the call (including `dialect`) if you prefer not to use `createPaginator`.
 
 ### `paginate`
 
@@ -252,25 +277,21 @@ The paginator only adds **order**, **limit**, and the **keyset/offset seek**. Pu
   items: T[]
   hasNextPage: boolean
   hasPrevPage: boolean
-  nextPage?: string
-  prevPage?: string
-  startCursor?: string
-  endCursor?: string
+  nextPage?: string      // pass as cursor.nextPage
+  prevPage?: string      // pass as cursor.prevPage
+  startCursor?: string   // token for the first item on this page
+  endCursor?: string     // token for the last item on this page
 }
 ```
 
-`hasNextPage` / `hasPrevPage` tell you whether another page exists. `nextPage` / `prevPage` are the tokens to fetch it — and they are **not always set** even when the flags are true (notably with pure offset past the end of the set). See the [FAQ](#faq).
+`hasNextPage` / `hasPrevPage` say whether another page exists. `nextPage` / `prevPage` are the tokens to fetch it. The flags can be true even when a token is missing — most often with pure offset past the end of the set. See the [FAQ](#faq).
 
 ### `paginateWithEdges`
 
-Same as `paginate`, but returns Relay-style edges instead of a flat `items` array:
+Same as `paginate`, but returns Relay-style edges instead of a flat `items` array. Each edge is `{ node, cursor }`; the page flags and `nextPage` / `prevPage` tokens match `paginate`.
 
 ```ts
-edges: {
-  node: T
-  cursor: string
-}
-;[]
+edges: Array<{ node: T; cursor: string }>
 ```
 
 ### Errors
@@ -311,8 +332,8 @@ Each token includes a hash of the sort spec (columns, directions, null placement
 **Why is `hasPrevPage` true but `prevPage` missing?**  
 Usually an **offset** request past the end of the data: there are no rows to build a keyset token from, but `offset > 0` means you are not on the first page. Step back with a smaller offset (`offset - limit`, floored at 0), or drop offset and use keyset tokens after the first successful page. If you still accept `cursor: { offset }`, do not wire “Back” only to `prevPage`.
 
-**Deep page still slow on Postgres?**  
-You are likely still on null-safe SQL. Set `notNull: true` on non-null leading keys, match a composite index, leave `keysetStrategy: 'auto'`. See [Faster seeks](#faster-seeks) and `pnpm bench:postgres`.
+**Deep page still slow?**  
+You are likely still on null-safe SQL, or missing a matching index. Set `notNull: true` on non-null leading columns, keep sort directions uniform, leave `keysetStrategy: 'auto'`, and check the query plan. See [Faster seeks](#faster-seeks).
 
 **When do I need `output`?**  
 Only when the name of the field on the result row differs from the last segment of `col` (for example `col: 'posts.created_at'` selected as `createdAt`).
