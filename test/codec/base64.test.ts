@@ -1,12 +1,12 @@
 import { base64UrlCodec } from '~/codec/base64Url.js'
 
 describe('base64UrlCodec', () => {
-  it('encodes a known string to base64', async () => {
+  it('encodes a known string to base64url (no padding)', async () => {
     expect(await base64UrlCodec.encode('hello')).toBe('aGVsbG8')
   })
 
-  it('decodes a known base64 string', async () => {
-    expect(await base64UrlCodec.decode('aGVsbG8=')).toBe('hello')
+  it('decodes a known base64url string', async () => {
+    expect(await base64UrlCodec.decode('aGVsbG8')).toBe('hello')
   })
 
   it('roundtrips unicode strings', async () => {
@@ -16,8 +16,12 @@ describe('base64UrlCodec', () => {
     expect(decoded).toBe(input)
   })
 
-  it('handles empty string', async () => {
-    expect(await base64UrlCodec.encode('')).toBe('')
-    expect(await base64UrlCodec.decode('')).toBe('')
+  it('rejects empty string on decode', () => {
+    expect(() => base64UrlCodec.decode('')).toThrow(/Invalid base64url/)
+  })
+
+  it('rejects non-base64url characters (padding, +/)', () => {
+    expect(() => base64UrlCodec.decode('aGVsbG8=')).toThrow(/Invalid base64url/)
+    expect(() => base64UrlCodec.decode('aG+/')).toThrow(/Invalid base64url/)
   })
 })

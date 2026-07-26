@@ -88,7 +88,7 @@ describe('codecPipe', () => {
       },
     }
 
-    const pipe = codecPipe(superJsonCodec, base64UrlCodec, createAesCodec('super-secret'), stashCodec(stash))
+    const pipe = codecPipe(superJsonCodec, base64UrlCodec, createAesCodec('super-secret-16x'), stashCodec(stash))
     const data = {
       data: new Date('2024-01-01T00:00:00.000Z'),
       name: 'Alice',
