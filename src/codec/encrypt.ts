@@ -22,11 +22,11 @@ const scrypt = (secret: string, salt: Buffer): Promise<Buffer> =>
 const concat = (...parts: Buffer[]) => Buffer.concat(parts)
 
 /**
-  * Create a codec that encrypts and decrypts strings using AES-256-GCM.
-  * 
-  * @param secret The secret key used for encryption and decryption. Must be at least 16 characters long.
-  * @returns A codec that can encode and decode strings.
-  * @throws An error if the secret is not a string or is less than 16 characters long.
+ * Create a codec that encrypts and decrypts strings using AES-256-GCM.
+ *
+ * @param secret The secret key used for encryption and decryption. Must be at least 16 characters long.
+ * @returns A codec that can encode and decode strings.
+ * @throws An error if the secret is not a string or is less than 16 characters long.
  */
 export const createAesCodec = (secret: string): Codec<string, string> => {
   if (typeof secret !== 'string' || secret.length < MIN_SECRET_LEN) {

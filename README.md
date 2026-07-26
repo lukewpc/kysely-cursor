@@ -134,13 +134,13 @@ Omit `nulls` → dialect-native defaults. `prev` inverts direction and explicit 
 
 Default: `codecPipe(superJsonCodec, base64UrlCodec)`.
 
-| Export                   | Role                                              |
-| ------------------------ | ------------------------------------------------- |
-| `superJsonCodec`         | Dates, BigInts, …                                 |
-| `base64UrlCodec`         | URL-safe string                                   |
-| `createAesCodec(secret)` | AES-256-GCM                                       |
-| `stashCodec(stash)`      | External store → UUID token                       |
-| `codecPipe(…)`           | Compose left-to-right on encode                   |
+| Export                   | Role                            |
+| ------------------------ | ------------------------------- |
+| `superJsonCodec`         | Dates, BigInts, …               |
+| `base64UrlCodec`         | URL-safe string                 |
+| `createAesCodec(secret)` | AES-256-GCM                     |
+| `stashCodec(stash)`      | External store → UUID token     |
+| `codecPipe(…)`           | Compose left-to-right on encode |
 
 ```ts
 // Encrypt tokens
