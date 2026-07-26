@@ -19,12 +19,12 @@ type Sortable = string | number | boolean | Date | bigint
 type IsAny<T> = 0 extends 1 & T ? true : false
 
 /**
- * Constrain `nullable` to the selected column type in `O`:
- * null → omit/`true`; non-null → omit/`false`; `any` → `boolean`.
- * Runtime still treats omit as nullable (null-safe path).
+ * Constrain `notNull` to the selected column type in `O`:
+ * non-null → omit/`true`; null → omit/`false`; `any` → `boolean`.
+ * Runtime treats omit as null-safe; only `notNull: true` unlocks seek-friendly SQL.
  */
-type NullableProp<Col> =
-  IsAny<Col> extends true ? { nullable?: boolean } : null extends Col ? { nullable?: true } : { nullable?: false }
+type NotNullProp<Col> =
+  IsAny<Col> extends true ? { notNull?: boolean } : null extends Col ? { notNull?: false } : { notNull?: true }
 
 type SortItemCommon<Allowed> = {
   dir?: OrderByDirection
@@ -41,7 +41,7 @@ type SortItemWithOutput<
 > = SortItemCommon<Allowed> & {
   col: ReferenceExpression<DB, TB>
   output: K
-} & NullableProp<O[K]>
+} & NotNullProp<O[K]>
 
 type SortItemFromCol<
   DB,
@@ -51,9 +51,9 @@ type SortItemFromCol<
   K extends MatchingKeys<O, Allowed>,
 > = SortItemCommon<Allowed> & {
   col: StringReference<DB, TB> & OptionallyQualifiedKey<TB, K>
-} & NullableProp<O[K]>
+} & NotNullProp<O[K]>
 
-/** One sort key; `nullable` is constrained by the selected field type on `O`. */
+/** One sort key; `notNull` is constrained by the selected field type on `O`. */
 export type SortItem<DB, TB extends keyof DB, O, Allowed> = {
   [K in MatchingKeys<O, Allowed>]: SortItemWithOutput<DB, TB, O, Allowed, K> | SortItemFromCol<DB, TB, O, Allowed, K>
 }[MatchingKeys<O, Allowed>]

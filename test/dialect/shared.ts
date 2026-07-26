@@ -753,15 +753,15 @@ export const runSharedTests = (
     expect(seen.map((r) => r.id)).toEqual(expected.map((r) => r.id))
   })
 
-  // ── keyset predicate optimization (nullable: false → plain OR / row compare) ──
+  // ── keyset predicate optimization (notNull: true → plain OR / row compare) ──
 
   it('paginates non-null marked uniform sorts equivalently to the default path', async () => {
     const { baseBuilder, fetchAllPlainSorted, paginator } = createHelpers()
 
-    // Same logical order as the unmarked default; nullable: false opts into the
+    // Same logical order as the unmarked default; notNull: true opts into the
     // fast emission path (plain OR / row compare depending on dialect).
     const sorts: SortSet<TestDB, 'users', TestRow> = [
-      { col: 'users.created_at', dir: 'desc', nullable: false },
+      { col: 'users.created_at', dir: 'desc', notNull: true },
       { col: 'users.id', dir: 'desc' },
     ]
     const expected = await fetchAllPlainSorted(sorts)
@@ -808,7 +808,7 @@ export const runSharedTests = (
   it('paginates non-null marked mixed-direction sorts (never row compare)', async () => {
     const { fetchAllPlainSorted, page } = createHelpers()
     const sorts: SortSet<TestDB, 'users', TestRow> = [
-      { col: 'users.created_at', dir: 'desc', nullable: false },
+      { col: 'users.created_at', dir: 'desc', notNull: true },
       { col: 'users.id', dir: 'asc' },
     ]
     const expected = await fetchAllPlainSorted(sorts)
@@ -825,7 +825,7 @@ export const runSharedTests = (
   it('honors keysetStrategy portable for non-null marked sorts', async () => {
     const { baseBuilder, dialect, fetchAllPlainSorted } = createHelpers()
     const sorts: SortSet<TestDB, 'users', TestRow> = [
-      { col: 'users.created_at', dir: 'asc', nullable: false },
+      { col: 'users.created_at', dir: 'asc', notNull: true },
       { col: 'users.id', dir: 'asc' },
     ]
     const expected = await fetchAllPlainSorted(sorts)

@@ -137,7 +137,7 @@ export const renderBaselineMarkdown = (baseline: BaselineReport, full?: BenchRep
   )
   lines.push('')
   lines.push(
-    'Cursor = keyset via library API (`nullable: false` on non-null keys). ' +
+    'Cursor = keyset via library API (`notNull: true` on non-null keys). ' +
       'Offset = built-in offset fallback. Speedup = offset/cursor (higher ⇒ cursor faster).',
   )
   lines.push('')

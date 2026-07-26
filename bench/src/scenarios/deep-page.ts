@@ -27,7 +27,7 @@ export const runDeepPage = async (ctx: ScenarioContext): Promise<ScenarioResult>
     scenario: 'deep-page',
     title: 'Deep page (single request at depth N)',
     description:
-      'Library API: one page at increasing depths. Cursor tokens are pre-resolved so only the page query is timed. Offset uses OFFSET = depth × pageSize. Feed sorts use nullable: false; emission is dialect-specific (PG/SQLite row compare, MSSQL plain OR, MySQL null-safe OR) plus the token codec.',
+      'Library API: one page at increasing depths. Cursor tokens are pre-resolved so only the page query is timed. Offset uses OFFSET = depth × pageSize. Feed sorts use notNull: true; emission is dialect-specific (PG/SQLite row compare, MSSQL plain OR, MySQL null-safe OR) plus the token codec.',
     samples,
     comparisons: buildComparisons(handle.name, 'deep-page', samples, labels),
   }

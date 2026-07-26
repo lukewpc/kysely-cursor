@@ -92,27 +92,27 @@ time near ~30s per dialect (MSSQL is often higher due to container startup).
 
 ### What SQL the library emits (timed scenarios)
 
-Timed scenarios set `nullable: false` on non-null sort keys. Emission still follows
+Timed scenarios set `notNull: true` on non-null sort keys. Emission still follows
 each dialect’s capability flags (same as production):
 
-| Dialect    | With `nullable: false` (feed / score sorts)    | Notes                                                               |
+| Dialect    | With `notNull: true` (feed / score sorts)    | Notes                                                               |
 | ---------- | ---------------------------------------------- | ------------------------------------------------------------------- |
 | `postgres` | **Row compare** `(created_at, id) < ($1,$2)`   | Index Cond seek                                                     |
 | `sqlite`   | **Row compare**                                | Same family                                                         |
 | `mssql`    | **Plain OR** (no tuple compare)                | Cursor still wins; latency can grow with depth                      |
-| `mysql`    | **Null-safe OR** (even with `nullable: false`) | Intentional: plain OR / row compare often regress at depth on MySQL |
+| `mysql`    | **Null-safe OR** (even with `notNull: true`) | Intentional: plain OR / row compare often regress at depth on MySQL |
 
 Default (unmarked) leading sorts stay **null-safe OR** on every dialect. On
 Postgres that shape is typically a **Filter** over an index walk
 (`Rows Removed by Filter ≈ OFFSET`), not an Index Cond seek — so deep pages
-look ~like OFFSET unless you opt into `nullable: false`.
+look ~like OFFSET unless you opt into `notNull: true`.
 
 ```sql
 -- default / MySQL optimized path
 WHERE (created_at IS NOT NULL AND created_at < $1)
    OR (created_at IS NOT NULL AND created_at = $1 AND id IS NOT NULL AND id < $2)
 
--- Postgres / SQLite with nullable: false
+-- Postgres / SQLite with notNull: true
 WHERE (created_at, id) < ($1, $2)
 ```
 
@@ -136,7 +136,7 @@ Typical Postgres plans at depth ~1000+ (warm cache, ~800B rows):
 | Form                           | Plan shape                        | Buffers        | Exec time (order of magnitude) |
 | ------------------------------ | --------------------------------- | -------------- | ------------------------------ |
 | Library null-safe OR (default) | Index Scan + Filter, many removed | ~thousands     | ~same as OFFSET                |
-| Library `nullable: false`      | Index Cond seek                   | ~single digits | **much faster**                |
+| Library `notNull: true`      | Index Cond seek                   | ~single digits | **much faster**                |
 | Ideal row comparison (raw SQL) | Index Cond seek                   | ~same as seek  | lower bound without codec      |
 | OFFSET deep skip               | Index Scan, skip N                | ~thousands     | baseline                       |
 

@@ -70,13 +70,13 @@ const validSortsWithBigint: SortSet<DB, 'users', UserRow> = [
   { col: 'users.id', output: 'id', dir: 'asc' },
 ]
 
-const validSortsNullableFalseOnNonNull: SortSet<DB, 'users', UserRow> = [
-  { col: 'users.created_at', dir: 'desc', nullable: false },
+const validSortsNotNullTrueOnNonNull: SortSet<DB, 'users', UserRow> = [
+  { col: 'users.created_at', dir: 'desc', notNull: true },
   { col: 'users.id', dir: 'desc' },
 ]
 
-const validSortsNullableTrueOnNullable: SortSet<DB, 'users', UserRow> = [
-  { col: 'users.name', dir: 'asc', nullable: true },
+const validSortsNotNullFalseOnNullable: SortSet<DB, 'users', UserRow> = [
+  { col: 'users.name', dir: 'asc', notNull: false },
   { col: 'users.id', dir: 'desc' },
 ]
 
@@ -86,7 +86,7 @@ const validSortsOmitOnNullable: SortSet<DB, 'users', UserRow> = [
   { col: 'users.id', dir: 'desc' },
 ]
 
-/** Explicit: omit on a non-null leading column is allowed (runtime still null-safe until false). */
+/** Explicit: omit on a non-null leading column is allowed (runtime still null-safe until notNull: true). */
 const validSortsOmitOnNonNull: SortSet<DB, 'users', UserRow> = [
   { col: 'users.created_at', dir: 'desc' },
   { col: 'users.id', dir: 'desc' },
@@ -94,40 +94,40 @@ const validSortsOmitOnNonNull: SortSet<DB, 'users', UserRow> = [
 
 /** Unqualified col names (single-table style). */
 const validSortsUnqualified: SortSet<DB, 'users', UserRow> = [
-  { col: 'name', dir: 'asc', nullable: true },
-  { col: 'created_at', dir: 'desc', nullable: false },
+  { col: 'name', dir: 'asc', notNull: false },
+  { col: 'created_at', dir: 'desc', notNull: true },
   { col: 'id', dir: 'desc' },
 ]
 
 /** Multi-leading mix: non-null, nullable, non-null final — correct flags. */
 const validSortsThreeKeyMix: SortSet<DB, 'users', UserRow> = [
-  { col: 'users.created_at', dir: 'desc', nullable: false },
-  { col: 'users.rating', dir: 'desc', nullable: true },
+  { col: 'users.created_at', dir: 'desc', notNull: true },
+  { col: 'users.rating', dir: 'desc', notNull: false },
   { col: 'users.id', dir: 'desc' },
 ]
 
-/** Final key may omit or set nullable: false (column is already required non-null). */
-const validSortsFinalNullableFalse: SortSet<DB, 'users', UserRow> = [
-  { col: 'users.created_at', dir: 'desc', nullable: false },
-  { col: 'users.id', dir: 'desc', nullable: false },
+/** Final key may omit or set notNull: true (column is already required non-null). */
+const validSortsFinalNotNullTrue: SortSet<DB, 'users', UserRow> = [
+  { col: 'users.created_at', dir: 'desc', notNull: true },
+  { col: 'users.id', dir: 'desc', notNull: true },
 ]
 
 /** Expression col + output: nullability follows O[output]. */
 const validSortsExpressionOutput: SortSet<DB, 'users', UserRow> = [
-  { col: sql`lower(name)`, output: 'name', dir: 'asc', nullable: true },
+  { col: sql`lower(name)`, output: 'name', dir: 'asc', notNull: false },
   { col: sql`id`, output: 'id', dir: 'desc' },
 ]
 
 /** Projected row: flags follow projected field types, not table columns. */
 const validSortsProjected: SortSet<DB, 'users', ProjectedRow> = [
-  { col: sql`users.name`, output: 'display_name', dir: 'asc', nullable: true },
-  { col: sql`users.created_at`, output: 'feed_at', dir: 'desc', nullable: false },
+  { col: sql`users.name`, output: 'display_name', dir: 'asc', notNull: false },
+  { col: sql`users.created_at`, output: 'feed_at', dir: 'desc', notNull: true },
   { col: sql`users.id`, output: 'id', dir: 'desc' },
 ]
 
 // Concrete SortSets remain assignable into the erased runtime form used by helpers.
-const _erasedRuntimeSorts: SortSet<any, any, any> = validSortsNullableFalseOnNonNull
-const _erasedRuntimeNullable: SortSet<any, any, any> = validSortsNullableTrueOnNullable
+const _erasedRuntimeSorts: SortSet<any, any, any> = validSortsNotNullTrueOnNonNull
+const _erasedRuntimeNullable: SortSet<any, any, any> = validSortsNotNullFalseOnNullable
 const _erasedRuntimeThreeKey: SortSet<any, any, any> = validSortsThreeKeyMix
 
 // @ts-expect-error - last sort must be non-nullable sortable
@@ -136,99 +136,98 @@ const _badLastNullable: SortSet<DB, 'users', UserRow> = [
   { col: 'users.name', output: 'name', dir: 'asc' },
 ]
 
-// @ts-expect-error - nullable: false is not allowed on a nullable column (name)
-const _badNullableFalseOnNullableCol: SortSet<DB, 'users', UserRow> = [
-  { col: 'users.name', dir: 'asc', nullable: false },
+// @ts-expect-error - notNull: true is not allowed on a nullable column (name)
+const _badNotNullTrueOnNullableCol: SortSet<DB, 'users', UserRow> = [
+  { col: 'users.name', dir: 'asc', notNull: true },
   { col: 'users.id', dir: 'desc' },
 ]
 
-// @ts-expect-error - nullable: false is not allowed on a nullable column (via output)
-const _badNullableFalseOnNullableOutput: SortSet<DB, 'users', UserRow> = [
-  { col: 'users.name', output: 'name', nullable: false },
+// @ts-expect-error - notNull: true is not allowed on a nullable column (via output)
+const _badNotNullTrueOnNullableOutput: SortSet<DB, 'users', UserRow> = [
+  { col: 'users.name', output: 'name', notNull: true },
   { col: 'users.id', dir: 'desc' },
 ]
 
-// @ts-expect-error - nullable: true is not allowed on a non-null column (created_at)
-const _badNullableTrueOnNonNullCol: SortSet<DB, 'users', UserRow> = [
-  { col: 'users.created_at', dir: 'desc', nullable: true },
+// @ts-expect-error - notNull: false is not allowed on a non-null column (created_at)
+const _badNotNullFalseOnNonNullCol: SortSet<DB, 'users', UserRow> = [
+  { col: 'users.created_at', dir: 'desc', notNull: false },
   { col: 'users.id', dir: 'desc' },
 ]
 
-// @ts-expect-error - nullable: true is not allowed on a non-null column (via output)
-const _badNullableTrueOnNonNullOutput: SortSet<DB, 'users', UserRow> = [
-  { col: 'users.created_at', output: 'created_at', nullable: true },
+// @ts-expect-error - notNull: false is not allowed on a non-null column (via output)
+const _badNotNullFalseOnNonNullOutput: SortSet<DB, 'users', UserRow> = [
+  { col: 'users.created_at', output: 'created_at', notNull: false },
   { col: 'users.id', dir: 'desc' },
 ]
 
-// @ts-expect-error - unqualified: nullable: false on nullable name
-const _badUnqualifiedNullableFalse: SortSet<DB, 'users', UserRow> = [
-  { col: 'name', dir: 'asc', nullable: false },
+// @ts-expect-error - unqualified: notNull: true on nullable name
+const _badUnqualifiedNotNullTrue: SortSet<DB, 'users', UserRow> = [
+  { col: 'name', dir: 'asc', notNull: true },
   { col: 'id', dir: 'desc' },
 ]
 
-// @ts-expect-error - unqualified: nullable: true on non-null created_at
-const _badUnqualifiedNullableTrue: SortSet<DB, 'users', UserRow> = [
-  { col: 'created_at', dir: 'desc', nullable: true },
+// @ts-expect-error - unqualified: notNull: false on non-null created_at
+const _badUnqualifiedNotNullFalse: SortSet<DB, 'users', UserRow> = [
+  { col: 'created_at', dir: 'desc', notNull: false },
   { col: 'id', dir: 'desc' },
 ]
 
 // @ts-expect-error - three-key mix: wrong flag only on middle nullable key
 const _badThreeKeyMiddleFalse: SortSet<DB, 'users', UserRow> = [
-  { col: 'users.created_at', dir: 'desc', nullable: false },
-  { col: 'users.rating', dir: 'desc', nullable: false },
+  { col: 'users.created_at', dir: 'desc', notNull: true },
+  { col: 'users.rating', dir: 'desc', notNull: true },
   { col: 'users.id', dir: 'desc' },
 ]
 
 // @ts-expect-error - three-key mix: wrong flag only on leading non-null key
 const _badThreeKeyLeadingTrue: SortSet<DB, 'users', UserRow> = [
-  { col: 'users.created_at', dir: 'desc', nullable: true },
-  { col: 'users.rating', dir: 'desc', nullable: true },
+  { col: 'users.created_at', dir: 'desc', notNull: false },
+  { col: 'users.rating', dir: 'desc', notNull: false },
   { col: 'users.id', dir: 'desc' },
 ]
 
-// @ts-expect-error - final key is non-null; nullable: true is not allowed
-const _badFinalNullableTrue: SortSet<DB, 'users', UserRow> = [
-  { col: 'users.created_at', dir: 'desc', nullable: false },
-  { col: 'users.id', dir: 'desc', nullable: true },
+// @ts-expect-error - final key is non-null; notNull: false is not allowed
+const _badFinalNotNullFalse: SortSet<DB, 'users', UserRow> = [
+  { col: 'users.created_at', dir: 'desc', notNull: true },
+  { col: 'users.id', dir: 'desc', notNull: false },
 ]
 
-// @ts-expect-error - expression+output: false on nullable O[output]
-const _badExpressionOutputFalse: SortSet<DB, 'users', UserRow> = [
-  { col: sql`lower(name)`, output: 'name', dir: 'asc', nullable: false },
+// @ts-expect-error - expression+output: notNull: true on nullable O[output]
+const _badExpressionOutputNotNullTrue: SortSet<DB, 'users', UserRow> = [
+  { col: sql`lower(name)`, output: 'name', dir: 'asc', notNull: true },
   { col: sql`id`, output: 'id', dir: 'desc' },
 ]
 
-// @ts-expect-error - expression+output: true on non-null O[output]
-const _badExpressionOutputTrue: SortSet<DB, 'users', UserRow> = [
-  { col: sql`created_at`, output: 'created_at', dir: 'desc', nullable: true },
+// @ts-expect-error - expression+output: notNull: false on non-null O[output]
+const _badExpressionOutputNotNullFalse: SortSet<DB, 'users', UserRow> = [
+  { col: sql`created_at`, output: 'created_at', dir: 'desc', notNull: false },
   { col: sql`id`, output: 'id', dir: 'desc' },
 ]
 
-// @ts-expect-error - projected O: false on nullable display_name
-const _badProjectedFalse: SortSet<DB, 'users', ProjectedRow> = [
-  { col: sql`users.name`, output: 'display_name', nullable: false },
+// @ts-expect-error - projected O: notNull: true on nullable display_name
+const _badProjectedNotNullTrue: SortSet<DB, 'users', ProjectedRow> = [
+  { col: sql`users.name`, output: 'display_name', notNull: true },
   { col: sql`users.id`, output: 'id' },
 ]
 
-// @ts-expect-error - projected O: true on non-null feed_at
-const _badProjectedTrue: SortSet<DB, 'users', ProjectedRow> = [
-  { col: sql`users.created_at`, output: 'feed_at', nullable: true },
+// @ts-expect-error - projected O: notNull: false on non-null feed_at
+const _badProjectedNotNullFalse: SortSet<DB, 'users', ProjectedRow> = [
+  { col: sql`users.created_at`, output: 'feed_at', notNull: false },
   { col: sql`users.id`, output: 'id' },
 ]
 
 // Widened `boolean` (not a true/false literal) is rejected once constrained to true|false.
 // Use `declare` so the binding is not narrowed by a literal initializer.
-declare const _widenedFalse: boolean
-// @ts-expect-error - boolean is not assignable to literal false on non-null column
+declare const _widenedNotNull: boolean
+// @ts-expect-error - boolean is not assignable to literal true on non-null column
 const _badWidenedBooleanOnNonNull: SortSet<DB, 'users', UserRow> = [
-  { col: 'users.created_at', dir: 'desc', nullable: _widenedFalse },
+  { col: 'users.created_at', dir: 'desc', notNull: _widenedNotNull },
   { col: 'users.id', dir: 'desc' },
 ]
 
-declare const _widenedTrue: boolean
-// @ts-expect-error - boolean is not assignable to literal true on nullable column
+// @ts-expect-error - boolean is not assignable to literal false on nullable column
 const _badWidenedBooleanOnNullable: SortSet<DB, 'users', UserRow> = [
-  { col: 'users.name', dir: 'asc', nullable: _widenedTrue },
+  { col: 'users.name', dir: 'asc', notNull: _widenedNotNull },
   { col: 'users.id', dir: 'desc' },
 ]
 
@@ -342,19 +341,19 @@ describe('paginate (type-level)', () => {
     })
   })
 
-  it('accepts matching nullable flags (omit, true, false) across SortSet shapes', async () => {
+  it('accepts matching notNull flags (omit, true, false) across SortSet shapes', async () => {
     const builder = makeBuilder<DB, 'users', UserRow>([])
     const paginator = createPaginator({ dialect: new PostgresPaginationDialect() })
 
-    await paginator.paginate<DB, 'users', UserRow, typeof validSortsNullableFalseOnNonNull>({
+    await paginator.paginate<DB, 'users', UserRow, typeof validSortsNotNullTrueOnNonNull>({
       query: builder,
-      sorts: validSortsNullableFalseOnNonNull,
+      sorts: validSortsNotNullTrueOnNonNull,
       limit: 10,
     })
 
-    await paginator.paginate<DB, 'users', UserRow, typeof validSortsNullableTrueOnNullable>({
+    await paginator.paginate<DB, 'users', UserRow, typeof validSortsNotNullFalseOnNullable>({
       query: builder,
-      sorts: validSortsNullableTrueOnNullable,
+      sorts: validSortsNotNullFalseOnNullable,
       limit: 10,
     })
 
@@ -382,9 +381,9 @@ describe('paginate (type-level)', () => {
       limit: 10,
     })
 
-    await paginator.paginate<DB, 'users', UserRow, typeof validSortsFinalNullableFalse>({
+    await paginator.paginate<DB, 'users', UserRow, typeof validSortsFinalNotNullTrue>({
       query: builder,
-      sorts: validSortsFinalNullableFalse,
+      sorts: validSortsFinalNotNullTrue,
       limit: 10,
     })
 
@@ -402,7 +401,7 @@ describe('paginate (type-level)', () => {
     })
   })
 
-  it('rejects nullable mismatches on inline paginate sorts (user DX path)', async () => {
+  it('rejects notNull mismatches on inline paginate sorts (user DX path)', async () => {
     const builder = makeBuilder<DB, 'users', UserRow>([])
     const paginator = createPaginator({ dialect: new PostgresPaginationDialect() })
 
@@ -430,8 +429,8 @@ describe('paginate (type-level)', () => {
     await paginator.paginate({
       query: builder,
       sorts: [
-        { col: 'users.created_at', dir: 'desc', nullable: false },
-        { col: 'users.name', dir: 'asc', nullable: true },
+        { col: 'users.created_at', dir: 'desc', notNull: true },
+        { col: 'users.name', dir: 'asc', notNull: false },
         { col: 'users.id', dir: 'desc' },
       ],
       limit: 10,
@@ -439,9 +438,9 @@ describe('paginate (type-level)', () => {
 
     await paginator.paginate({
       query: builder,
-      // @ts-expect-error - inline: nullable: false on nullable name
+      // @ts-expect-error - inline: notNull: true on nullable name
       sorts: [
-        { col: 'users.name', dir: 'asc', nullable: false },
+        { col: 'users.name', dir: 'asc', notNull: true },
         { col: 'users.id', dir: 'desc' },
       ],
       limit: 10,
@@ -449,9 +448,9 @@ describe('paginate (type-level)', () => {
 
     await paginator.paginate({
       query: builder,
-      // @ts-expect-error - inline: nullable: true on non-null created_at
+      // @ts-expect-error - inline: notNull: false on non-null created_at
       sorts: [
-        { col: 'users.created_at', dir: 'desc', nullable: true },
+        { col: 'users.created_at', dir: 'desc', notNull: false },
         { col: 'users.id', dir: 'desc' },
       ],
       limit: 10,
@@ -461,8 +460,8 @@ describe('paginate (type-level)', () => {
       query: builder,
       // @ts-expect-error - inline: wrong flag on middle key of a three-key sort
       sorts: [
-        { col: 'users.created_at', dir: 'desc', nullable: false },
-        { col: 'users.rating', dir: 'desc', nullable: false },
+        { col: 'users.created_at', dir: 'desc', notNull: true },
+        { col: 'users.rating', dir: 'desc', notNull: true },
         { col: 'users.id', dir: 'desc' },
       ],
       limit: 10,
@@ -470,9 +469,9 @@ describe('paginate (type-level)', () => {
 
     await paginator.paginateWithEdges({
       query: builder,
-      // @ts-expect-error - inline edges path: nullable: false on nullable name
+      // @ts-expect-error - inline edges path: notNull: true on nullable name
       sorts: [
-        { col: 'users.name', dir: 'asc', nullable: false },
+        { col: 'users.name', dir: 'asc', notNull: true },
         { col: 'users.id', dir: 'desc' },
       ],
       limit: 10,

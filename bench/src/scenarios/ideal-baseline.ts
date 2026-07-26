@@ -7,7 +7,7 @@ import { measure, samplesFor, summarize } from '../metrics.js'
 import type { BenchDB, ComparisonRow, Post, Sample, ScenarioContext, ScenarioResult } from '../types.js'
 
 /**
- * Raw SQL keyset matching library emission for feed sorts with `nullable: false`.
+ * Raw SQL keyset matching library emission for feed sorts with `notNull: true`.
  *
  * | Dialect  | Library path                     | Ideal baseline SQL        |
  * |----------|----------------------------------|---------------------------|
@@ -68,11 +68,11 @@ const describeForm = (form: IdealKeysetForm): string => {
     case 'row_compare':
       return (
         'Raw keyset via row comparison `(created_at, id) < ($1, $2)` vs OFFSET — ' +
-        'same shape as library deep-page with `nullable: false` (no token codec).'
+        'same shape as library deep-page with `notNull: true` (no token codec).'
       )
     case 'null_safe_or':
       return (
-        'Raw keyset via null-safe OR (MySQL library path even with `nullable: false`) ' +
+        'Raw keyset via null-safe OR (MySQL library path even with `notNull: true`) ' +
         'vs OFFSET — no library wrappers or token codec.'
       )
     case 'plain_or':

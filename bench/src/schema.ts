@@ -6,7 +6,7 @@ import type { Post } from './types.js'
  * - scoreboard / ranking (score + id) — scoreboard scenario
  *
  * The final key is always non-null unique `id`.
- * `nullable: false` opts into seek-friendly keyset emission (row compare / plain OR);
+ * `notNull: true` opts into seek-friendly keyset emission (row compare / plain OR);
  * created_at and score are NOT NULL in the bench schema.
  */
 export const feedSorts = [
@@ -14,7 +14,7 @@ export const feedSorts = [
     col: 'posts.created_at' as const,
     dir: 'desc' as const,
     output: 'created_at' as const,
-    nullable: false as const,
+    notNull: true as const,
   },
   { col: 'posts.id' as const, dir: 'desc' as const, output: 'id' as const },
 ]
@@ -24,7 +24,7 @@ export const scoreSorts = [
     col: 'posts.score' as const,
     dir: 'desc' as const,
     output: 'score' as const,
-    nullable: false as const,
+    notNull: true as const,
   },
   { col: 'posts.id' as const, dir: 'desc' as const, output: 'id' as const },
 ]
