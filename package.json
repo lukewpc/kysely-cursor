@@ -5,7 +5,11 @@
   "description": "Cursor based pagination utils for Kysely",
   "repository": {
     "type": "git",
-    "url": "https://github.com/lukewpc/kysely-cursor.git"
+    "url": "git+https://github.com/lukewpc/kysely-cursor.git"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   },
   "files": [
     "dist",
@@ -62,7 +66,7 @@
   "engines": {
     "node": ">=20.0.0"
   },
-  "packageManager": "pnpm@10.18.0",
+  "packageManager": "pnpm@10.18.3",
   "dependencies": {
     "superjson": "^2.2.6",
     "zod": "^4.4.3"

@@ -6,9 +6,15 @@ on:
       - main
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
   pull-requests: write
+  # Required for npm Trusted Publishing (OIDC)
+  # https://docs.npmjs.com/trusted-publishers
   id-token: write
 
 jobs:
@@ -27,6 +33,11 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      # pnpm publish shells out to npm; OIDC needs npm >= 11.5.1
+      - name: Ensure npm for OIDC
+        run: npm install -g npm@11.6.2
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -39,4 +50,4 @@ jobs:
           createGithubReleases: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # No NPM_TOKEN — publish via OIDC Trusted Publishing
