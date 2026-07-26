@@ -83,13 +83,13 @@ const sorts = [
 ] as const
 ```
 
-| Field     | Notes                                                              |
-| --------- | ------------------------------------------------------------------ |
-| `col`     | Column/expression; may be qualified                                |
-| `dir`     | `'asc'` (default) or `'desc'`                                      |
-| `output`  | Result field name; defaults to last segment of `col`               |
-| `notNull` | Leading keys only. Opt-in for seek-friendly SQL (see below)        |
-| `nulls`   | `'first'` \| `'last'` on Postgres/SQLite; throws on MySQL/MSSQL    |
+| Field     | Notes                                                           |
+| --------- | --------------------------------------------------------------- |
+| `col`     | Column/expression; may be qualified                             |
+| `dir`     | `'asc'` (default) or `'desc'`                                   |
+| `output`  | Result field name; defaults to last segment of `col`            |
+| `notNull` | Leading keys only. Opt-in for seek-friendly SQL (see below)     |
+| `nulls`   | `'first'` \| `'last'` on Postgres/SQLite; throws on MySQL/MSSQL |
 
 - **`notNull`:** omit (default) stays null-safe even if TS says non-null. Set `notNull: true` to unlock plain OR / row compare. `notNull: false` only allowed on nullable columns.
 - Leading sorts may be nullable; the **final** sort must be non-null and unique.
