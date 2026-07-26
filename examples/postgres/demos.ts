@@ -5,39 +5,6 @@ import type { Database, PostRow } from './db.js'
 
 const PAGE_SIZE = 5
 
-/** Chronological feed (`nullable: false` enables Postgres row-value compare). */
-export const feedSorts = [
-  {
-    col: 'posts.created_at' as const,
-    dir: 'desc' as const,
-    output: 'created_at' as const,
-    nullable: false as const,
-  },
-  { col: 'posts.id' as const, dir: 'desc' as const, output: 'id' as const },
-] as const
-
-/** Ranking by score. */
-export const scoreSorts = [
-  {
-    col: 'posts.score' as const,
-    dir: 'desc' as const,
-    output: 'score' as const,
-    nullable: false as const,
-  },
-  { col: 'posts.id' as const, dir: 'desc' as const, output: 'id' as const },
-] as const
-
-/** Nullable `published_at` with `nulls: 'last'` (drafts sort after published posts). */
-export const publishedSorts = [
-  {
-    col: 'posts.published_at' as const,
-    dir: 'desc' as const,
-    output: 'published_at' as const,
-    nulls: 'last' as const,
-  },
-  { col: 'posts.id' as const, dir: 'desc' as const, output: 'id' as const },
-] as const
-
 function postsQuery(db: Kysely<Database>) {
   return db.selectFrom('posts').select(['id', 'title', 'author', 'score', 'published_at', 'created_at'])
 }
@@ -90,9 +57,13 @@ export async function demoForwardAndBack(db: Kysely<Database>, paginator: Pagina
 
   const query = postsQuery(db)
 
+  // sorts are inlined so TS checks them against this query's selected columns
   const page1 = await paginator.paginate({
     query,
-    sorts: feedSorts,
+    sorts: [
+      { col: 'posts.created_at', dir: 'desc', notNull: true },
+      { col: 'posts.id', dir: 'desc' },
+    ],
     limit: PAGE_SIZE,
   })
 
@@ -107,7 +78,10 @@ export async function demoForwardAndBack(db: Kysely<Database>, paginator: Pagina
 
   const page2 = await paginator.paginate({
     query,
-    sorts: feedSorts,
+    sorts: [
+      { col: 'posts.created_at', dir: 'desc', notNull: true },
+      { col: 'posts.id', dir: 'desc' },
+    ],
     limit: PAGE_SIZE,
     cursor: { nextPage: page1.nextPage },
   })
@@ -120,7 +94,10 @@ export async function demoForwardAndBack(db: Kysely<Database>, paginator: Pagina
 
   const back = await paginator.paginate({
     query,
-    sorts: feedSorts,
+    sorts: [
+      { col: 'posts.created_at', dir: 'desc', notNull: true },
+      { col: 'posts.id', dir: 'desc' },
+    ],
     limit: PAGE_SIZE,
     cursor: { prevPage: page2.prevPage },
   })
@@ -142,7 +119,10 @@ export async function demoFilteredFeed(db: Kysely<Database>, paginator: Paginato
 
   const page = await paginator.paginate({
     query,
-    sorts: feedSorts,
+    sorts: [
+      { col: 'posts.created_at', dir: 'desc', notNull: true },
+      { col: 'posts.id', dir: 'desc' },
+    ],
     limit: PAGE_SIZE,
   })
 
@@ -157,7 +137,10 @@ export async function demoNullablePublishedAt(db: Kysely<Database>, paginator: P
 
   const page = await paginator.paginate({
     query: postsQuery(db),
-    sorts: publishedSorts,
+    sorts: [
+      { col: 'posts.published_at', dir: 'desc', nulls: 'last' },
+      { col: 'posts.id', dir: 'desc' },
+    ],
     limit: PAGE_SIZE,
   })
 
@@ -172,7 +155,10 @@ export async function demoWithEdges(db: Kysely<Database>, paginator: Paginator) 
 
   const result = await paginator.paginateWithEdges({
     query: postsQuery(db),
-    sorts: scoreSorts,
+    sorts: [
+      { col: 'posts.score', dir: 'desc', notNull: true },
+      { col: 'posts.id', dir: 'desc' },
+    ],
     limit: 3,
   })
 
@@ -195,7 +181,10 @@ export async function demoOffsetFallback(db: Kysely<Database>, paginator: Pagina
 
   const page = await paginator.paginate({
     query: postsQuery(db),
-    sorts: feedSorts,
+    sorts: [
+      { col: 'posts.created_at', dir: 'desc', notNull: true },
+      { col: 'posts.id', dir: 'desc' },
+    ],
     limit: PAGE_SIZE,
     cursor: { offset: PAGE_SIZE },
   })
@@ -217,7 +206,10 @@ export async function demoWalkAll(db: Kysely<Database>, paginator: Paginator) {
   for (;;) {
     const page = await paginator.paginate({
       query,
-      sorts: feedSorts,
+      sorts: [
+        { col: 'posts.created_at', dir: 'desc', notNull: true },
+        { col: 'posts.id', dir: 'desc' },
+      ],
       limit: PAGE_SIZE,
       cursor,
     })

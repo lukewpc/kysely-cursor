@@ -26,7 +26,7 @@ export const runScoreboard = async (ctx: ScenarioContext): Promise<ScenarioResul
     scenario: 'scoreboard',
     title: 'Scoreboard (ORDER BY score DESC, id DESC)',
     description:
-      'Full-table ranking by score with id as tie-breaker. Models leaderboards and “top N” feeds. Index: (score, id). Sorts use nullable: false (score and id are NOT NULL).',
+      'Full-table ranking by score with id as tie-breaker. Models leaderboards and “top N” feeds. Index: (score, id). Sorts use notNull: true (score and id are NOT NULL).',
     samples,
     comparisons: buildComparisons(handle.name, 'scoreboard', samples, labels),
   }

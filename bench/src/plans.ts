@@ -3,7 +3,7 @@ import type { DialectHandle } from './types.js'
 
 /**
  * Capture EXPLAIN output at a deep page (Postgres only via DialectHandle.explain):
- * 1. Library seek path (`nullable: false` → row compare) — matches timed deep-page
+ * 1. Library seek path (`notNull: true` → row compare) — matches timed deep-page
  * 2. Library default null-safe OR — untimed reference (often Filter ≈ OFFSET)
  * 3. OFFSET — baseline skip plan
  */
@@ -37,7 +37,7 @@ WHERE (
 ORDER BY created_at DESC, id DESC
 LIMIT ${pageSize + 1}`
 
-  // Library path for feedSorts with nullable: false on Postgres (auto → row_compare).
+  // Library path for feedSorts with notNull: true on Postgres (auto → row_compare).
   const librarySeekSql = `
 SELECT id, author_id, title, body, status, score, created_at
 FROM posts
@@ -53,7 +53,7 @@ OFFSET ${offset}
 LIMIT ${pageSize + 1}`
 
   for (const [title, q] of [
-    [`library keyset (nullable: false → row compare) at depth=${depth}`, librarySeekSql],
+    [`library keyset (notNull: true → row compare) at depth=${depth}`, librarySeekSql],
     [`library keyset (default null-safe OR) at depth=${depth}`, nullSafeSql],
     [`offset at depth=${depth} (OFFSET ${offset})`, offsetSql],
   ] as const) {

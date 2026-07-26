@@ -55,7 +55,7 @@ DATABASE_URL=postgres://user:pass@localhost:5432/mydb pnpm dev
 | 5   | Numeric offset            | `cursor: { offset }`                            |
 | 6   | Full result walk          | Loop on `nextPage` until exhausted              |
 
-Supporting modules also show composite indexes matched to sort shapes, `nullable: false` for Postgres row-value seeks, pluggable codecs, and `keysetStrategy: 'auto'`.
+Supporting modules also show composite indexes matched to sort shapes, `notNull: true` for Postgres row-value seeks, pluggable codecs, and `keysetStrategy: 'auto'`.
 
 ```
 examples/postgres/

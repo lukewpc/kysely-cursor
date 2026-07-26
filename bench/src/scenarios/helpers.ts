@@ -6,7 +6,7 @@ import type { ComparisonRow, DialectHandle, Post, Sample, ScenarioContext, Scena
 
 export type QueryFactory = () => SelectQueryBuilder<any, any, Post>
 
-export type SortSpec = readonly { col: any; dir?: any; output?: any; nulls?: any; nullable?: boolean }[]
+export type SortSpec = readonly { col: any; dir?: any; output?: any; nulls?: any; notNull?: boolean }[]
 
 /**
  * Walk forward `depth` pages with keyset cursors and return the nextPage token

@@ -55,7 +55,7 @@ const payloadFor = (sorts: SortSet<DB, 'users', UserRow>, k: Record<string, unkn
 })
 
 describe('classifyKeyset', () => {
-  it('defaults leading sorts to null_safe when nullable is omitted', () => {
+  it('defaults leading sorts to null_safe when notNull is omitted', () => {
     const sorts: SortSet<DB, 'users', UserRow> = [
       { col: 'users.created_at', dir: 'desc' },
       { col: 'users.id', dir: 'desc' },
@@ -68,9 +68,9 @@ describe('classifyKeyset', () => {
     expect(classifyKeyset(sorts, payload)).toEqual({ kind: 'null_safe' })
   })
 
-  it('classifies simple_non_null when all non-final sorts set nullable: false', () => {
+  it('classifies simple_non_null when all non-final sorts set notNull: true', () => {
     const sorts: SortSet<DB, 'users', UserRow> = [
-      { col: 'users.created_at', dir: 'desc', nullable: false },
+      { col: 'users.created_at', dir: 'desc', notNull: true },
       { col: 'users.id', dir: 'desc' },
     ]
     const payload = payloadFor(sorts, {
@@ -86,11 +86,11 @@ describe('classifyKeyset', () => {
 
   it('detects uniform ASC and mixed directions', () => {
     const asc: SortSet<DB, 'users', UserRow> = [
-      { col: 'users.created_at', dir: 'asc', nullable: false },
+      { col: 'users.created_at', dir: 'asc', notNull: true },
       { col: 'users.id', dir: 'asc' },
     ]
     const mixed: SortSet<DB, 'users', UserRow> = [
-      { col: 'users.created_at', dir: 'desc', nullable: false },
+      { col: 'users.created_at', dir: 'desc', notNull: true },
       { col: 'users.id', dir: 'asc' },
     ]
     const k = { created_at: new Date('2023-01-01'), id: 1 }
@@ -105,11 +105,11 @@ describe('classifyKeyset', () => {
     })
   })
 
-  it('forces null_safe when any sort has explicit nulls, even with nullable: false', () => {
+  it('forces null_safe when any sort has explicit nulls, even with notNull: true', () => {
     // Intentional misconfig vs row types: name is string | null, but runtime may still
-    // see nullable: false + nulls and must force the null-safe path.
+    // see notNull: true + nulls and must force the null-safe path.
     const sorts = [
-      { col: 'users.name', dir: 'asc', nullable: false, nulls: 'last' },
+      { col: 'users.name', dir: 'asc', notNull: true, nulls: 'last' },
       { col: 'users.id', dir: 'asc' },
     ] as unknown as SortSet<DB, 'users', UserRow>
     const payload = payloadFor(sorts, { name: 'A', id: 1 })
@@ -118,9 +118,9 @@ describe('classifyKeyset', () => {
   })
 
   it('forces null_safe when a non-final cursor value is null', () => {
-    // Intentional misconfig: nullable: false on a nullable-typed column with a null cursor value.
+    // Intentional misconfig: notNull: true on a nullable-typed column with a null cursor value.
     const sorts = [
-      { col: 'users.name', dir: 'asc', nullable: false },
+      { col: 'users.name', dir: 'asc', notNull: true },
       { col: 'users.id', dir: 'asc' },
     ] as unknown as SortSet<DB, 'users', UserRow>
     const payload = payloadFor(sorts, { name: null, id: 1 })
@@ -130,7 +130,7 @@ describe('classifyKeyset', () => {
 
   it('rejects a null final cursor value as INVALID_TOKEN', () => {
     const sorts: SortSet<DB, 'users', UserRow> = [
-      { col: 'users.created_at', dir: 'desc', nullable: false },
+      { col: 'users.created_at', dir: 'desc', notNull: true },
       { col: 'users.id', dir: 'desc' },
     ]
     const payload = payloadFor(sorts, {
@@ -143,7 +143,7 @@ describe('classifyKeyset', () => {
 
   it('rejects a missing cursor key as INVALID_TOKEN', () => {
     const sorts: SortSet<DB, 'users', UserRow> = [
-      { col: 'users.created_at', dir: 'desc', nullable: false },
+      { col: 'users.created_at', dir: 'desc', notNull: true },
       { col: 'users.id', dir: 'desc' },
     ]
     const payload = payloadFor(sorts, { created_at: new Date('2023-01-01') })
@@ -210,7 +210,7 @@ describe('selectKeysetStrategy', () => {
 describe('buildPlainOrPredicate', () => {
   it('emits classic multi-column OR without null guards (DESC)', () => {
     const sorts: SortSet<DB, 'users', UserRow> = [
-      { col: 'users.created_at', dir: 'desc', nullable: false },
+      { col: 'users.created_at', dir: 'desc', notNull: true },
       { col: 'users.id', dir: 'desc' },
     ]
     const createdAt = new Date('2023-01-01')
@@ -236,7 +236,7 @@ describe('buildPlainOrPredicate', () => {
 
   it('emits classic multi-column OR without null guards (ASC)', () => {
     const sorts: SortSet<DB, 'users', UserRow> = [
-      { col: 'users.created_at', dir: 'asc', nullable: false },
+      { col: 'users.created_at', dir: 'asc', notNull: true },
       { col: 'users.id', dir: 'asc' },
     ]
     const createdAt = new Date('2023-01-01')
@@ -296,7 +296,7 @@ describe('buildRowComparePredicate', () => {
 
   it('rejects null final and missing keys', () => {
     const sorts: SortSet<DB, 'users', UserRow> = [
-      { col: 'users.created_at', dir: 'desc', nullable: false },
+      { col: 'users.created_at', dir: 'desc', notNull: true },
       { col: 'users.id', dir: 'desc' },
     ]
     const eb = makeEb()
@@ -312,7 +312,7 @@ describe('buildRowComparePredicate', () => {
 
   it('returns a SQL fragment for multi-column uniform sorts', () => {
     const sorts: SortSet<DB, 'users', UserRow> = [
-      { col: 'users.created_at', dir: 'desc', nullable: false },
+      { col: 'users.created_at', dir: 'desc', notNull: true },
       { col: 'users.id', dir: 'desc' },
     ]
     const payload = payloadFor(sorts, { created_at: new Date('2023-01-01'), id: 42 })
@@ -344,9 +344,9 @@ describe('emitKeysetPredicate', () => {
     expect(json).toContain('"users.created_at"')
   })
 
-  it('uses plain_or when portable + nullable: false', () => {
+  it('uses plain_or when portable + notNull: true', () => {
     const sorts: SortSet<DB, 'users', UserRow> = [
-      { col: 'users.created_at', dir: 'desc', nullable: false },
+      { col: 'users.created_at', dir: 'desc', notNull: true },
       { col: 'users.id', dir: 'desc' },
     ]
     const createdAt = new Date('2023-01-01')
@@ -364,7 +364,7 @@ describe('emitKeysetPredicate', () => {
 
   it('uses plain_or for mixed directions even when dialect supports row compare', () => {
     const sorts: SortSet<DB, 'users', UserRow> = [
-      { col: 'users.created_at', dir: 'desc', nullable: false },
+      { col: 'users.created_at', dir: 'desc', notNull: true },
       { col: 'users.id', dir: 'asc' },
     ]
     const createdAt = new Date('2023-01-01')
@@ -390,7 +390,7 @@ describe('emitKeysetPredicate', () => {
 
   it('selects row_compare for auto + supporting dialect + uniform non-null sorts', () => {
     const sorts: SortSet<DB, 'users', UserRow> = [
-      { col: 'users.created_at', dir: 'desc', nullable: false },
+      { col: 'users.created_at', dir: 'desc', notNull: true },
       { col: 'users.id', dir: 'desc' },
     ]
     const payload = payloadFor(sorts, { created_at: new Date('2023-01-01'), id: 42 })

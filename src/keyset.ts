@@ -44,8 +44,8 @@ export const classifyKeyset = (sorts: SortSet<any, any, any>, payload: CursorPay
     if (sort.nulls === 'first' || sort.nulls === 'last') return { kind: 'null_safe' }
 
     if (!isLast) {
-      if (sort.nullable !== false) return { kind: 'null_safe' }
-      // Null on a "non-null" leading key → fall back to null-safe SQL.
+      if (sort.notNull !== true) return { kind: 'null_safe' }
+      // Null on a "notNull" leading key → fall back to null-safe SQL.
       if (value === null) return { kind: 'null_safe' }
     }
   }
