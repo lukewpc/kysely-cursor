@@ -1,6 +1,6 @@
 # kysely-cursor benchmarks
 
-**2026-07-26T12:53:03.255Z** · `f9a2ed4` · 50,000 rows · page 25 · iters 4/1 · walk 25 · depths [0,100,500] · postgres,mysql,mssql,sqlite · deep-page,sequential-walk
+**2026-07-26T12:56:09.724Z** · `cbf4fa5` · 50,000 rows · page 25 · iters 4/1 · walk 25 · depths [0,100,500] · postgres,mysql,mssql,sqlite · deep-page,sequential-walk
 
 Cursor = keyset via library API (`notNull: true` on non-null keys). Offset = built-in offset fallback. Speedup = offset/cursor (higher ⇒ cursor faster).
 
@@ -8,10 +8,10 @@ Cursor = keyset via library API (`notNull: true` on non-null keys). Offset = bui
 
 | Dialect | Label | Cursor | Offset | Speedup |
 | --- | --- | ---: | ---: | ---: |
-| postgres | depth=500 | 0.588ms | 1.97ms | 3.36× |
-| mysql | depth=500 | 0.601ms | 70.0ms | 117× |
-| mssql | depth=500 | 6.42ms | 27.8ms | 4.33× |
-| sqlite | depth=500 | 0.251ms | 0.498ms | 1.99× |
+| postgres | depth=500 | 0.688ms | 2.79ms | 4.06× |
+| mysql | depth=500 | 0.489ms | 55.1ms | 113× |
+| mssql | depth=500 | 8.23ms | 27.9ms | 3.39× |
+| sqlite | depth=500 | 0.202ms | 0.494ms | 2.45× |
 
 ## postgres
 
@@ -19,15 +19,15 @@ Cursor = keyset via library API (`notNull: true` on non-null keys). Offset = bui
 
 | Label | Cursor | Offset | Speedup | Δ ms |
 | --- | ---: | ---: | ---: | ---: |
-| depth=0 | 1.26ms | 0.938ms | 0.74× | -0.323ms |
-| depth=100 | 0.684ms | 1.09ms | 1.59× | 0.405ms |
-| depth=500 | 0.588ms | 1.97ms | 3.36× | 1.38ms |
+| depth=0 | 1.25ms | 0.922ms | 0.74× | -0.325ms |
+| depth=100 | 0.699ms | 0.871ms | 1.24× | 0.171ms |
+| depth=500 | 0.688ms | 2.79ms | 4.06× | 2.11ms |
 
 ### sequential-walk
 
 | Label | Cursor | Offset | Speedup | Δ ms |
 | --- | ---: | ---: | ---: | ---: |
-| walk=25 | 16.0ms | 18.1ms | 1.13× | 2.05ms |
+| walk=25 | 14.9ms | 14.8ms | 1.00× | -0.048ms |
 
 ## mysql
 
@@ -35,15 +35,15 @@ Cursor = keyset via library API (`notNull: true` on non-null keys). Offset = bui
 
 | Label | Cursor | Offset | Speedup | Δ ms |
 | --- | ---: | ---: | ---: | ---: |
-| depth=0 | 1.11ms | 0.888ms | 0.80× | -0.222ms |
-| depth=100 | 1.18ms | 56.2ms | 47.8× | 55.0ms |
-| depth=500 | 0.601ms | 70.0ms | 117× | 69.4ms |
+| depth=0 | 0.803ms | 0.620ms | 0.77× | -0.184ms |
+| depth=100 | 0.612ms | 43.4ms | 70.8× | 42.8ms |
+| depth=500 | 0.489ms | 55.1ms | 113× | 54.6ms |
 
 ### sequential-walk
 
 | Label | Cursor | Offset | Speedup | Δ ms |
 | --- | ---: | ---: | ---: | ---: |
-| walk=25 | 16.0ms | 21.3ms | 1.33× | 5.26ms |
+| walk=25 | 12.1ms | 15.2ms | 1.26× | 3.18ms |
 
 ## mssql
 
@@ -51,15 +51,15 @@ Cursor = keyset via library API (`notNull: true` on non-null keys). Offset = bui
 
 | Label | Cursor | Offset | Speedup | Δ ms |
 | --- | ---: | ---: | ---: | ---: |
-| depth=0 | 2.11ms | 1.89ms | 0.89× | -0.227ms |
-| depth=100 | 2.95ms | 6.75ms | 2.29× | 3.80ms |
-| depth=500 | 6.42ms | 27.8ms | 4.33× | 21.3ms |
+| depth=0 | 2.43ms | 2.00ms | 0.82× | -0.433ms |
+| depth=100 | 2.96ms | 7.47ms | 2.52× | 4.51ms |
+| depth=500 | 8.23ms | 27.9ms | 3.39× | 19.7ms |
 
 ### sequential-walk
 
 | Label | Cursor | Offset | Speedup | Δ ms |
 | --- | ---: | ---: | ---: | ---: |
-| walk=25 | 39.2ms | 50.8ms | 1.30× | 11.6ms |
+| walk=25 | 46.5ms | 55.7ms | 1.20× | 9.14ms |
 
 ## sqlite
 
@@ -67,21 +67,21 @@ Cursor = keyset via library API (`notNull: true` on non-null keys). Offset = bui
 
 | Label | Cursor | Offset | Speedup | Δ ms |
 | --- | ---: | ---: | ---: | ---: |
-| depth=0 | 0.469ms | 0.314ms | 0.67× | -0.156ms |
-| depth=100 | 0.267ms | 0.247ms | 0.93× | -0.020ms |
-| depth=500 | 0.251ms | 0.498ms | 1.99× | 0.247ms |
+| depth=0 | 0.433ms | 0.299ms | 0.69× | -0.134ms |
+| depth=100 | 0.239ms | 0.236ms | 0.99× | -0.003ms |
+| depth=500 | 0.202ms | 0.494ms | 2.45× | 0.292ms |
 
 ### sequential-walk
 
 | Label | Cursor | Offset | Speedup | Δ ms |
 | --- | ---: | ---: | ---: | ---: |
-| walk=25 | 7.29ms | 3.51ms | 0.48× | -3.784ms |
+| walk=25 | 4.75ms | 2.84ms | 0.60× | -1.909ms |
 
 ## Deep-page growth
 
-- **postgres**: cursor ×0.47, offset ×2.10 (depth=0→depth=500); deepest speedup 3.36×
-- **mysql**: cursor ×0.54, offset ×78.87 (depth=0→depth=500); deepest speedup 117×
-- **mssql**: cursor ×3.04, offset ×14.72 (depth=0→depth=500); deepest speedup 4.33×
-- **sqlite**: cursor ×0.53, offset ×1.59 (depth=0→depth=500); deepest speedup 1.99×
+- **postgres**: cursor ×0.55, offset ×3.03 (depth=0→depth=500); deepest speedup 4.06×
+- **mysql**: cursor ×0.61, offset ×88.98 (depth=0→depth=500); deepest speedup 113×
+- **mssql**: cursor ×3.38, offset ×13.97 (depth=0→depth=500); deepest speedup 3.39×
+- **sqlite**: cursor ×0.47, offset ×1.65 (depth=0→depth=500); deepest speedup 2.45×
 
 _Absolute ms depends on machine/runner; use committed baseline diffs for regressions. Full methodology: `bench/README.md`._
